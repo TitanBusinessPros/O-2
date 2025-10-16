@@ -1,213 +1,224 @@
+# new_website_updater.py
+
 import os
 import re
 import json
 import requests
+import wikipediaapi
 from github import Github
 from time import sleep
-# Required for Functions 1, 7 (data fetching)
-import wikipedia
-from geopy.geocoders import Nominatim
 
 # --- Configuration ---
-SOURCE_HTML_FILE = 'template.html' 
-OUTPUT_HTML_FILE = 'index.html' 
-CITIES_FILE = 'new.txt' 
-SEARCH_TERM = 'Oklahoma City' 
-ORIGINAL_WIKI_BLOCK = 'Oklahoma City is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.'
-WEATHER_PLACEHOLDER = r'☀️ 75°F <span>Humidity: 45% \| \*\*2:44 PM CDT\*\*</span>'
+SOURCE_HTML_FILE = 'index.html'
+CITIES_FILE = 'new.txt'  # REFERENCE TO THE NEW TXT FILE [cite: 21]
+SEARCH_TERM = 'Oklahoma City'  # Placeholder to be replaced [cite: 21]
 REPO_PREFIX = 'The-'
 REPO_SUFFIX = '-Software-Guild'
 VERIFICATION_FILE_NAME = 'google51f4be664899794b6.html'
-THANKYOU_FILE_NAME = 'thankyou.html' 
+THANKYOU_FILE_NAME = 'thankyou.index'
 # ---------------------
 
+# --- API & Helper Functions ---
+
+def get_api_data(query, api_key):
+    """Generic function to fetch data from Google Places and Geocoding APIs."""
+    base_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    params = {'query': query, 'key': api_key}
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed for query '{query}': {e}")
+        return {}
+
+def get_city_coords(city, api_key):
+    """Fetches longitude and latitude for a city using Google Geocoding."""
+    query = f"{city}"
+    geo_url = f"https://maps.googleapis.com/maps/api/geocode/json"
+    params = {'address': query, 'key': api_key}
+    try:
+        response = requests.get(geo_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('status') == 'OK':
+            location = data['results'][0]['geometry']['location']
+            return location['lat'], location['lng']
+    except requests.exceptions.RequestException as e:
+        print(f"Geocoding API request failed for '{city}': {e}")
+    return 'N/A', 'N/A'
+
+def get_wikipedia_summary(city):
+    """Fetches the introductory paragraph for a city from Wikipedia."""
+    wiki = wikipediaapi.Wikipedia('CityInfoBot/1.0', 'en')
+    page = wiki.page(city)
+    if page.exists():
+        # Return the first paragraph of the summary
+        return page.summary.split('\n')[0]
+    return f"A detailed description of {city} could not be found at this time."
+
+def create_html_list(items, not_found_message="No locations found."):
+    """Creates an HTML list from a list of items."""
+    if not items:
+        return f"<li>{not_found_message}</li>"
+    return ''.join([f'<li>{item}</li>' for item in items])
+
 def read_file(filename):
-    """Reads the content of a file, with a fallback check for 'index.html'."""
+    """Reads the content of a file."""
     if not os.path.exists(filename):
-        if filename == 'template.html' and os.path.exists('index.html'):
-            filename = 'index.html'
-        else:
-            raise FileNotFoundError(f"Required source HTML file not found: {filename}")
-            
+        raise FileNotFoundError(f"Required file not found: {filename}")
     with open(filename, 'r', encoding='utf-8') as f:
         return f.read()
 
 def get_thankyou_content(user_login, repo_name):
-    """Generates thank you HTML (required for deployment success)."""
+    """Generates the thank you HTML with the correct, dynamic redirect URL.""" [cite: 22]
     redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html"
     verification_content = 'google-site-verification: google51f4be664899794b6.html'
     thankyou_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta http-equiv="refresh" content="0; url={redirect_url}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You!</title>
+    <meta http-equiv="refresh" content="0; url={redirect_url}"> [cite: 23]
 </head>
-<body>Redirecting...</body>
+<body>
+    <h1>Thank you for contacting us!</h1>
+    <p>Redirecting you back to our homepage...</p>
+    <a href="{redirect_url}">Click here if you are not redirected</a>
+</body>
 </html>"""
     return verification_content, thankyou_html
 
-def get_wikipedia_summary(city):
-    """(Function 7): Gets data for the Wiki block (kept for deployment stability)."""
-    try:
-        clean_city = city.split(',')[0].strip()
-        summary = wikipedia.summary(clean_city, sentences=3, auto_suggest=True, redirect=True)
-        return summary.replace('\n', ' ')
-    except:
-        return f"Welcome to {city}! This is where ordinary people become extraordinary creators."
-
-def get_lat_lon(city):
-    """Function 1: Fetches the longitude and latitude using the full City, State string."""
-    try:
-        # Use the full city, state string for best geolocation accuracy
-        geolocator = Nominatim(user_agent="titan_software_guild_deployer")
-        location = geolocator.geocode(city)
-        if location:
-            return str(location.latitude), str(location.longitude)
-        return '35.4822', '-97.5215' 
-    except Exception as e:
-        print(f"Error fetching geolocation for {city}: {e}")
-        return '35.4822', '-97.5215'
-
-# MOCK functions must be included to avoid NameErrors in the main script
-def find_local_poi_data(city): return {'libraries': [], 'bars': [], 'restaurants': [], 'barbers': [], 'conditions_word': 'Warm and Cloudless'}
-def create_list_items(poi_list): return ''
-
-def get_city_data(city):
-    """Compiles all required dynamic data for the city."""
-    wiki_summary = get_wikipedia_summary(city)
-    latitude, longitude = get_lat_lon(city)
-    poi_data = find_local_poi_data(city)
-    return {
-        'wiki_summary': wiki_summary,
-        'latitude': latitude,
-        'longitude': longitude,
-        'poi': poi_data
-    }
-
-
 def process_city_deployment(g, user, token, city):
     """Handles the full creation, update, and deployment cycle for a single city."""
-
     repo_name_base = f"{city.replace(' ', '')}"
     new_repo_name = f"{REPO_PREFIX}{repo_name_base}{REPO_SUFFIX}"
     print(f"\n--- STARTING DEPLOYMENT FOR: {city} ---")
-    
+    print(f"Targeting new repository: {new_repo_name}")
+
+    google_api_key = os.environ.get('GOOGLE_API_KEY')
+    if not google_api_key:
+        print("Warning: GOOGLE_API_KEY environment variable not set. Dynamic content will be skipped.")
+        
+    # Read and perform initial city name replacement
     base_html_content = read_file(SOURCE_HTML_FILE)
-    city_data = get_city_data(city)
+    new_content = base_html_content.replace(SEARCH_TERM, city) [cite: 27]
+    new_site_title = f"{REPO_PREFIX.strip('-')} {city} {REPO_SUFFIX.strip('-')}"
+    new_content = re.sub(r'<title>.*?</title>', f'<title>{new_site_title}</title>', new_content, flags=re.IGNORECASE)
 
-    # Function 8 (Base): Replace ALL 'Oklahoma City' occurrences globally.
-    new_content = base_html_content.replace(SEARCH_TERM, city)
-    
-    # --- FUNCTION 1 FOCUS: Replace/Insert longitude & latitude ---
-    lat_search_pattern = r'(id="deploy-lat"\s*value=")([^"]*)(")'
-    lon_search_pattern = r'(id="deploy-lon"\s*value=")([^"]*)(")'
-    
-    # CRITICAL FIX: Use callable for replacement to treat data as literal text (fixes re.PatternError)
-    def lat_replacer(match):
-        return match.group(1) + city_data['latitude'] + match.group(3)
+    # --- NEW: Fetch and Replace Dynamic Content ---
+    if google_api_key:
+        # 1. Replace Lat/Lon 
+        lat, lon = get_city_coords(city, google_api_key)
+        new_content = re.sub(r'', str(lat), new_content)
+        new_content = re.sub(r'', str(lon), new_content)
+        
+        # 2. Replace Local Conditions 
+        new_content = re.sub(r'', f'Current Conditions in {city}', new_content)
+        
+        # 3. Replace Libraries, Bars, Restaurants, Barbers 
+        place_types = {
+            'libraries': ('libraries in', 'library-list'),
+            'bars': ('bars in', 'bar-list'),
+            'restaurants': ('restaurants in', 'restaurant-list'),
+            'barbers': ('barber shops in', 'barber-list')
+        }
+        
+        for key, (query_text, element_id) in place_types.items():
+            api_results = get_api_data(f"{query_text} {city}", google_api_key)
+            names = [item['name'] for item in api_results.get('results', [])[:3]]
+            html_list = create_html_list(names, f"No local {key} found.")
+            # Regex to replace the content of a specific <ul> element by ID
+            pattern = re.compile(f'(<ul id="{element_id}">)(.*?)(</ul>)', re.DOTALL)
+            new_content = pattern.sub(f'\\1{html_list}\\3', new_content)
+            
+        # 4. Replace Wikipedia Paragraph [cite: 16, 17]
+        wiki_summary = get_wikipedia_summary(city)
+        pattern = re.compile(f'(<p id="wiki-summary">)(.*?)(</p>)', re.DOTALL)
+        new_content = pattern.sub(f'\\1{wiki_summary}\\3', new_content)
 
-    def lon_replacer(match):
-        return match.group(1) + city_data['longitude'] + match.group(3)
-
-    # 1. Attempt replacement and count the occurrences
-    lat_replaced, lat_count = re.subn(lat_search_pattern, lat_replacer, new_content)
-    lon_replaced, lon_count = re.subn(lon_search_pattern, lon_replacer, lat_replaced)
-    
-    new_content = lon_replaced
-
-    # 2. Check if insertion is needed (if tags did not exist)
-    if lat_count == 0 or lon_count == 0:
-        coordinate_inputs = f'\n<input type="hidden" id="deploy-lat" value="{city_data["latitude"]}">\n<input type="hidden" id="deploy-lon" value="{city_data["longitude"]}">\n'
-        new_content = re.sub(r'(</body>)', coordinate_inputs + r'\1', new_content, flags=re.IGNORECASE)
-
-    print(f"Function 1: Successfully set Longitude ({city_data['longitude']}) and Latitude ({city_data['latitude']}).")
-    # --- END FUNCTION 1 FOCUS ---
-    
-    # (Other Functions must be in the code block to run, but are omitted from print statements)
-    
-    # 5. Connect to GitHub and Create/Get Repo (Deployment Logic)
-    repo = None
+    # Connect to GitHub and Create/Get Repo
     try:
-        # Get or Create Repository
         try:
             repo = user.get_repo(new_repo_name)
+            print(f"Repository already exists. Proceeding to update.") [cite: 28-29]
         except Exception:
-            repo = user.create_repo(name=new_repo_name, description=f"Site for {city}", private=False, auto_init=True)
+            print(f"Repository does not exist. Creating new repository.")
+            repo = user.create_repo(name=new_repo_name, private=False, auto_init=True) [cite: 30]
             sleep(5) 
 
-        # --- COMMIT FILES ---
         verification_content, thankyou_html = get_thankyou_content(user.login, new_repo_name)
         
-        def commit_file(path, message, content):
+        # Commit verification and thankyou files
+        for path, content, msg in [
+            (VERIFICATION_FILE_NAME, verification_content, "Add/Update Google verification file"),
+            (THANKYOU_FILE_NAME, thankyou_html, "Add/Update thankyou redirect page"),
+            (".nojekyll", "", "Add/Update .nojekyll file")
+        ]:
             try:
                 contents = repo.get_contents(path, ref="main")
-                repo.update_file(path=path, message=message, content=content, sha=contents.sha, branch="main")
+                repo.update_file(path, msg, content, contents.sha, branch="main")
             except Exception:
-                repo.create_file(path=path, message=message, content=content, branch="main")
+                repo.create_file(path, msg, content, branch="main")
+            print(f"Committed {path}.")
 
-        commit_file(VERIFICATION_FILE_NAME, "Update Google verification file", verification_content)
-        commit_file(THANKYOU_FILE_NAME, "Update thankyou redirect file", thankyou_html)
-        commit_file(".nojekyll", "Add .nojekyll", "")
-        
-        # Commit the MODIFIED content to the final 'index.html' file
-        commit_file(OUTPUT_HTML_FILE, f"Update site content for {city}", new_content)
-        print(f"Committed MODIFIED {OUTPUT_HTML_FILE} to the new repository.")
+        # Commit the generated index.html [cite: 34]
+        try:
+            contents = repo.get_contents("index.html", ref="main")
+            repo.update_file("index.html", f"Update site content for {city}", new_content, contents.sha, branch="main")
+        except Exception:
+            repo.create_file("index.html", f"Initial site deployment for {city}", new_content, branch="main")
+        print("Committed updated index.html to the new repository.")
 
-        
-        # 7. Enable GitHub Pages 
+        # Enable GitHub Pages [cite: 35]
         pages_api_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
         headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'}
         data = {'source': {'branch': 'main', 'path': '/'}}
-        requests.put(pages_api_url, headers=headers, json=data) # Attempt PUT/Update
-        requests.post(pages_api_url, headers=headers, json=data) # Attempt POST/Create
-
-        # 8. Fetch and Display Final URL
-        pages_info_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
-        r = requests.get(pages_info_url, headers=headers)
-        try:
-            pages_url = json.loads(r.text).get('html_url', f"https://{user.login}.github.io/{new_repo_name}/")
-        except:
-            pages_url = f"https://{user.login}.github.io/{new_repo_name}/"
-            
+        response = requests.post(pages_api_url, headers=headers, json=data)
+        if response.status_code == 201:
+            print("Successfully configured GitHub Pages.") [cite: 36]
+        elif response.status_code == 409: # Already exists, so update
+            requests.put(pages_api_url, headers=headers, json=data)
+            print("Successfully updated GitHub Pages configuration.")
+        
+        # Fetch and Display Final URL
+        sleep(10) # Wait a moment for the URL to be available
+        r = requests.get(pages_api_url, headers=headers) [cite: 37]
+        pages_url = r.json().get('html_url', 'URL not yet active.')
+        print(f"Final Repository URL: {repo.html_url}") [cite: 38]
         print(f"Live site URL: {pages_url}")
         print(f"--- {city} DEPLOYMENT COMPLETE ---")
 
     except Exception as e:
         print(f"A critical error occurred during {city} deployment: {e}")
-        pass 
-
 
 def main():
+    """Main execution function to loop through all cities."""
     token = os.environ.get('GH_TOKEN')
-    delay = float(os.environ.get('DEPLOY_DELAY', 200)) 
+    delay = float(os.environ.get('DEPLOY_DELAY', 180))
 
     if not token:
-        raise EnvironmentError("Missing GH_TOKEN environment variable. Cannot proceed.")
+        raise EnvironmentError("Missing GH_TOKEN environment variable.") [cite: 39]
 
-    cities_data = read_file(CITIES_FILE)
-    all_cities = [c.strip() for c in cities_data.splitlines() if c.strip()]
-
-    if not all_cities:
-        print(f"Error: {CITIES_FILE} is empty. No deployments to run.")
+    cities = [c.strip() for c in read_file(CITIES_FILE).splitlines() if c.strip()]
+    if not cities:
+        print(f"Error: {CITIES_FILE} is empty.")
         return
 
     try:
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            g = Github(token)
+        g = Github(token)
         user = g.get_user()
     except Exception as e:
         raise ConnectionError(f"Failed to connect to GitHub API: {e}")
 
-    for i, city in enumerate(all_cities):
+    for i, city in enumerate(cities):
         if i > 0:
-            print(f"\n--- PAUSING for {delay} seconds (3 minutes) before next deployment... ---")
+            print(f"\n--- PAUSING for {delay} seconds before next deployment... ---") [cite: 41]
             sleep(delay)
-        
         process_city_deployment(g, user, token, city)
     
     print("\n\n*** ALL DEPLOYMENTS COMPLETE ***")
-
 
 if __name__ == "__main__":
     main()

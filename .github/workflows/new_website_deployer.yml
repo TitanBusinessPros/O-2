@@ -13,7 +13,6 @@ jobs:
       contents: write
       pages: write
       id-token: write
-      repositories: write
 
     steps:
     - name: 1. Checkout source repository

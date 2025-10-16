@@ -11,11 +11,8 @@ from geopy.geocoders import Nominatim
 # --- Configuration ---
 SOURCE_HTML_FILE = 'index.html' 
 CITIES_FILE = 'new.txt' 
-# Placeholder to be replaced across the site (Function 8)
 SEARCH_TERM = 'Oklahoma City' 
-# The original, static city description block to be replaced (Function 7)
 ORIGINAL_WIKI_BLOCK = 'Oklahoma City is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.'
-# Placeholder for local conditions (Function 2)
 WEATHER_PLACEHOLDER = r'☀️ 75°F <span>Humidity: 45% \| \*\*2:44 PM CDT\*\*</span>'
 REPO_PREFIX = 'The-'
 REPO_SUFFIX = '-Software-Guild'
@@ -30,7 +27,51 @@ def read_file(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         return f.read()
 
-# ... (get_thankyou_content function remains the same) ...
+# =========================================================
+# **FIXED:** FUNCTION DEFINITION RESTORED TO PREVENT NAMEERROR
+# =========================================================
+def get_thankyou_content(user_login, repo_name):
+    """Generates the thank you HTML with the correct, dynamic redirect URL."""
+    redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html"
+    verification_content = 'google-site-verification: google51f4be664899794b6.html'
+    thankyou_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thank You!</title>
+    <meta http-equiv="refresh" content="0; url={redirect_url}">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            background: #0a0a0f;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }}
+        h1 {{
+            color: #00d4ff;
+        }}
+        a {{
+            color: #00d4ff;
+            text-decoration: none;
+            font-weight: bold;
+        }}
+    </style>
+</head>
+<body>
+    <div>
+        <h1>Thank you for contacting us!</h1>
+        <p>Redirecting you back to the new guild homepage...</p>
+        <a href="{redirect_url}">Click here if you are not redirected</a>
+    </div>
+</body>
+</html>"""
+    return verification_content, thankyou_html
 
 # ***************************************************************
 # --- NEW DATA ACQUISITION FUNCTIONS ---
@@ -39,10 +80,8 @@ def read_file(filename):
 def get_wikipedia_summary(city):
     """Function 7: Fetches a short summary paragraph about the city from Wikipedia."""
     try:
-        # Set to find 3 sentences max
         clean_city = city.split(',')[0].strip()
         summary = wikipedia.summary(clean_city, sentences=3, auto_suggest=True, redirect=True)
-        # Ensure newlines are replaced with spaces for proper HTML insertion
         return summary.replace('\n', ' ')
     except (wikipedia.exceptions.PageError, wikipedia.exceptions.DisambiguationError):
         return f"Welcome to {city}! This is where ordinary people become extraordinary creators. The Titan Software Guild is the future."
@@ -57,7 +96,7 @@ def get_lat_lon(city):
         location = geolocator.geocode(city)
         if location:
             return str(location.latitude), str(location.longitude)
-        return '35.4822', '-97.5215' # Default to OKC coordinates on failure
+        return '35.4822', '-97.5215' 
     except Exception as e:
         print(f"Error fetching geolocation for {city}: {e}")
         return '35.4822', '-97.5215'
@@ -65,9 +104,7 @@ def get_lat_lon(city):
 def find_local_poi_data(city):
     """
     Functions 3, 4, 5, 6: MOCK DATA
-    In a live environment, this is replaced by a real Places API call.
     """
-    # MOCK data structure to demonstrate successful replacement
     return {
         'libraries': [
             {'name': f'{city} Central Library', 'url': f'https://google.com/search?q={city}+library+1'},
@@ -137,9 +174,6 @@ def process_city_deployment(g, user, token, city):
     new_content = re.sub(r'<title>.*?</title>', f'<title>{new_site_title}</title>', new_content, flags=re.IGNORECASE)
 
     # Function 7 (FIXED): Replace the specific Wiki Paragraph block.
-    # The error you reported happened because the first replace (Function 8) changed 'Oklahoma City' 
-    # but the text block still contained 'OKC'. The fix is to replace the *original* block with 
-    # the new city's Wiki summary.
     new_content = new_content.replace(
         ORIGINAL_WIKI_BLOCK,
         city_data['wiki_summary']
@@ -149,7 +183,6 @@ def process_city_deployment(g, user, token, city):
     # Function 2: Replace Current Local Conditions Word
     new_conditions = f'{city_data["poi"]["conditions_word"]} <span>Check local weather for details.</span>'
 
-    # Use re.sub with re.escape to handle all special characters in the pattern
     new_content = re.sub(
         re.escape(WEATHER_PLACEHOLDER), 
         re.escape(new_conditions),
@@ -158,7 +191,6 @@ def process_city_deployment(g, user, token, city):
     print(f"Function 2: Replaced local conditions with: {city_data['poi']['conditions_word']}")
 
     # Functions 3, 4, 5, 6: Replace POI Links inside the <ul> tags (Robust method)
-    # Map: (ul_class, poi_data_key) -> ul_class must match template.html
     poi_map = [
         ('library-list', 'libraries'),  # Function 3
         ('jobs-list', 'bars'),          # Function 4 
@@ -169,7 +201,6 @@ def process_city_deployment(g, user, token, city):
     for ul_class, data_key in poi_map:
         new_list_html = create_list_items(city_data['poi'][data_key])
         
-        # Regex to find the entire <ul> block by its class and replace its *contents*
         ul_pattern = rf'(<ul class="{re.escape(ul_class)}">)(.*?)(</ul>)'
         
         new_content = re.sub(
@@ -182,7 +213,6 @@ def process_city_deployment(g, user, token, city):
 
 
     # Function 1: Replace longitude & latitude 
-    # Assumes hidden inputs with id="deploy-lat" and id="deploy-lon" exist.
     lat_search_pattern = r'(id="deploy-lat"\s*value=")([^"]*)(")'
     lon_search_pattern = r'(id="deploy-lon"\s*value=")([^"]*)(")'
     
@@ -194,33 +224,85 @@ def process_city_deployment(g, user, token, city):
     # END CORE MODIFICATIONS
     # ----------------------------------------------------
 
-    # 5-8. Remaining GitHub deployment logic (omitted for brevity, same as before)
+    # 5. Connect to GitHub and Create/Get Repo
     repo = None
     try:
         # Get or Create Repository
-        # ... (repo creation code)
+        try:
+            repo = user.get_repo(new_repo_name)
+            print(f"Repository already exists. Proceeding to update.")
+        except Exception:
+            print(f"Repository does not exist. Creating new repository.")
+            repo = user.create_repo(
+                name=new_repo_name,
+                description=f"GitHub Pages site for {city} Software Guild",
+                private=False,
+                auto_init=True
+            )
+            sleep(5) 
 
         # --- NEW FILE COMMITS ---
+        # THIS LINE WILL NOW SUCCEED:
         verification_content, thankyou_html = get_thankyou_content(user.login, new_repo_name)
         
-        # 6a. Commit Google Verification File
-        # ... (commit code)
-        
-        # 6b. Commit Thank You Redirect File
-        # ... (commit code)
-        
-        # 6c. Commit Core Files
-        # ... (commit code for .nojekyll and index.html)
+        # 6a-6c: Commit Files
+        try:
+            contents = repo.get_contents(VERIFICATION_FILE_NAME, ref="main")
+            repo.update_file(path=VERIFICATION_FILE_NAME, message="Update Google verification file", content=verification_content, sha=contents.sha, branch="main")
+        except Exception:
+            repo.create_file(path=VERIFICATION_FILE_NAME, message="Add Google verification file for Console", content=verification_content, branch="main")
 
+        try:
+            contents = repo.get_contents(THANKYOU_FILE_NAME, ref="main")
+            repo.update_file(path=THANKYOU_FILE_NAME, message="Update thankyou redirect file", content=thankyou_html, sha=contents.sha, branch="main")
+        except Exception:
+            repo.create_file(path=THANKYOU_FILE_NAME, message="Add thankyou redirect page", content=thankyou_html, branch="main")
+        
+        try:
+            contents = repo.get_contents(".nojekyll", ref="main")
+            repo.update_file(path=".nojekyll", message="Update .nojekyll file", content="", sha=contents.sha, branch="main")
+        except Exception:
+            repo.create_file(path=".nojekyll", message="Add .nojekyll to enable direct HTML serving", content="", branch="main")
+
+        # Commit the generated index.html
+        try:
+            contents = repo.get_contents("index.html", ref="main")
+            repo.update_file(path="index.html", message=f"Update site content for {city}", content=new_content, sha=contents.sha, branch="main")
+        except Exception:
+            repo.create_file(path="index.html", message=f"Initial site deployment for {city}", content=new_content, branch="main")
+        print("Committed all files to the new repository.")
+
+        
         # 7. Enable GitHub Pages using direct requests API call
-        # ... (pages configuration code)
+        pages_api_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
+        headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'}
+        data = {'source': {'branch': 'main', 'path': '/'}}
+        
+        # Configure GitHub Pages
+        r = requests.post(pages_api_url, headers=headers, json=data)
+        if r.status_code == 201:
+            print("Successfully configured GitHub Pages (New Site).")
+        elif r.status_code == 409:
+            r = requests.put(pages_api_url, headers=headers, json=data)
+            if r.status_code == 204:
+                print("Successfully updated GitHub Pages configuration.")
+        else:
+            print(f"Warning: Failed to configure GitHub Pages. Status Code: {r.status_code}")
 
         # 8. Fetch and Display Final URL
-        # ... (final URL retrieval code)
+        pages_info_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
+        r = requests.get(pages_info_url, headers=headers)
         
+        try:
+            pages_url = json.loads(r.text).get('html_url', 'URL not yet active or failed to retrieve.')
+        except:
+            pages_url = 'URL failed to retrieve, check repo settings manually.'
+        print(f"Final Repository URL: {repo.html_url}")
+        print(f"Live site URL: {pages_url}")
         print(f"--- {city} DUPLICATE DEPLOYMENT COMPLETE ---")
 
     except Exception as e:
+        # This block should now only be hit for unhandled API or file errors
         print(f"A critical error occurred during {city} duplicate deployment: {e}")
         pass # Allow other cities to proceed
 

@@ -1,4 +1,4 @@
-name: City Website Deployer
+name: New Manual City Website Deployer Duplicate
 
 on:
   # Allows the workflow to be triggered manually from the GitHub UI
@@ -8,7 +8,7 @@ jobs:
   create-and-deploy-all-repos:
     runs-on: ubuntu-latest
     
-    # Required permission settings for creating new repositories
+    # Required permission settings for creating new repositories and enabling Pages
     permissions:
       contents: write
       pages: write
@@ -26,18 +26,13 @@ jobs:
         python-version: '3.x'
 
     - name: 3. Install Required Python Libraries
-      run: pip install PyGithub requests
+      # Installs PyGithub, requests, wikipedia (for Function 7), and geopy (for Function 1)
+      run: pip install PyGithub requests wikipedia geopy
       
-    - name: 4. Run City Deployment Script
+    - name: 4. Run Script to Create & Deploy ALL Repos
       env:
-        # GitHub token for repository operations
-        GH_TOKEN: ${{ secrets.new7 }}
+        # This SECRET must contain your GitHub Personal Access Token
+        GH_TOKEN: ${{ secrets.new7 }} 
         # Set the required delay between repo creations (in seconds)
-        DEPLOY_DELAY: 180 
+        DEPLOY_DELAY: 200 
       run: python new_website_updater.py
-
-    - name: 5. Verify Deployment Completion
-      run: |
-        echo "City deployment script execution completed."
-        echo "Check the logs above for any errors."
-        echo "If repositories were created successfully, they should be available in your GitHub account."

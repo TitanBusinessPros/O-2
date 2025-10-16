@@ -1,24 +1,26 @@
 import os
 import re
 import json
-import requests
+import requests 
 from github import Github
 from time import sleep
-# --- NEW IMPORTS REQUIRED FOR DATA FETCHING ---
-import wikipedia
-from geopy.geocoders import Nominatim
 
 # --- Configuration ---
-SOURCE_HTML_FILE = 'index.html' 
+SOURCE_HTML_FILE = 'index.html'
+# REFERENCE TO THE NEW TXT FILE
 CITIES_FILE = 'new.txt' 
 # Placeholder to be replaced
-SEARCH_TERM = 'Oklahoma City'
+SEARCH_TERM = 'Oklahoma City' 
 REPO_PREFIX = 'The-'
 REPO_SUFFIX = '-Software-Guild'
 # File paths and content for the new files
 VERIFICATION_FILE_NAME = 'google51f4be664899794b6.html'
-THANKYOU_FILE_NAME = 'thankyou.html' 
+THANKYOU_FILE_NAME = 'thankyou.index'
 # ---------------------
+
+# API Keys (you'll need to add these to your GitHub secrets)
+OPENCAGE_API_KEY = os.environ.get('OPENCAGE_API_KEY', 'your_opencage_api_key')
+GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', 'your_google_places_api_key')
 
 def read_file(filename):
     """Reads the content of a file."""
@@ -27,10 +29,130 @@ def read_file(filename):
     with open(filename, 'r', encoding='utf-8') as f:
         return f.read()
 
+def get_city_coordinates(city_name):
+    """Get latitude and longitude for a city using OpenCage Geocoding API."""
+    try:
+        url = f"https://api.opencagedata.com/geocode/v1/json?q={city_name}&key={OPENCAGE_API_KEY}"
+        response = requests.get(url)
+        data = response.json()
+        
+        if data['results']:
+            geometry = data['results'][0]['geometry']
+            return geometry['lat'], geometry['lng']
+        else:
+            print(f"Could not find coordinates for {city_name}")
+            return 35.4676, -97.5164  # Default to Oklahoma City coordinates
+    except Exception as e:
+        print(f"Error getting coordinates for {city_name}: {e}")
+        return 35.4676, -97.5164
+
+def get_places_by_type(city_name, place_type, limit=3):
+    """Get places of specific type in a city using Google Places API."""
+    try:
+        # First get city coordinates
+        lat, lng = get_city_coordinates(city_name)
+        
+        # Search for places
+        if place_type == "library":
+            search_query = f"library in {city_name}"
+        elif place_type == "bar":
+            search_query = f"bar in {city_name}"
+        elif place_type == "restaurant":
+            search_query = f"restaurant in {city_name}"
+        elif place_type == "barber":
+            search_query = f"barber shop in {city_name}"
+        else:
+            search_query = f"{place_type} in {city_name}"
+            
+        url = f"https://maps.googleapis.com/maps/api/place/textsearch/json"
+        params = {
+            'query': search_query,
+            'key': GOOGLE_PLACES_API_KEY
+        }
+        
+        response = requests.get(url, params=params)
+        data = response.json()
+        
+        places = []
+        for place in data.get('results', [])[:limit]:
+            places.append(place['name'])
+            
+        return places
+    except Exception as e:
+        print(f"Error getting {place_type} for {city_name}: {e}")
+        # Return default places if API fails
+        if place_type == "library":
+            return ["Downtown Library", "Public Library", "Community Library"]
+        elif place_type == "bar":
+            return ["Local Pub", "Sports Bar", "Lounge"]
+        elif place_type == "restaurant":
+            return ["Local Diner", "Family Restaurant", "Cafe"]
+        elif place_type == "barber":
+            return ["Classic Barbershop", "Modern Cuts", "Style Salon"]
+        return []
+
+def get_wikipedia_summary(city_name):
+    """Get Wikipedia summary for a city using Wikipedia REST API."""
+    try:
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{city_name.replace(' ', '_')}"
+        response = requests.get(url)
+        data = response.json()
+        
+        if 'extract' in data:
+            return data['extract']
+        else:
+            return f"{city_name} is a vibrant city with a rich history and diverse community."
+    except Exception as e:
+        print(f"Error getting Wikipedia summary for {city_name}: {e}")
+        return f"{city_name} is a vibrant city with a rich history and diverse community."
+
+def replace_html_section(html_content, section_id, new_content):
+    """Replace content within a specific HTML section."""
+    pattern = f'<div[^>]*id=["\']{section_id}["\'][^>]*>.*?</div>'
+    replacement = f'<div id="{section_id}">{new_content}</div>'
+    return re.sub(pattern, replacement, html_content, flags=re.DOTALL)
+
+def create_libraries_section(libraries):
+    """Create HTML for libraries section."""
+    html = '<h3>Local Library Access</h3><ul>'
+    for library in libraries:
+        html += f'<li>{library}</li>'
+    html += '</ul>'
+    return html
+
+def create_bars_section(bars):
+    """Create HTML for bars section."""
+    html = '<h3>Local Spots to Meet</h3><ul>'
+    for bar in bars:
+        html += f'<li>{bar}</li>'
+    html += '</ul>'
+    return html
+
+def create_restaurants_section(restaurants):
+    """Create HTML for restaurants section."""
+    html = '<h3>Restaurants Near Me</h3><ul>'
+    for restaurant in restaurants:
+        html += f'<li>{restaurant}</li>'
+    html += '</ul>'
+    return html
+
+def create_barbers_section(barbers):
+    """Create HTML for barbers section."""
+    html = '<h3>Get a Haircut and Get a Real Job!</h3><ul>'
+    for barber in barbers:
+        html += f'<li>{barber}</li>'
+    html += '</ul>'
+    return html
+
 def get_thankyou_content(user_login, repo_name):
     """Generates the thank you HTML with the correct, dynamic redirect URL."""
+    # Base URL for GitHub Pages is typically: https://USERNAME.github.io/REPO_NAME/
     redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html"
+    
+    # Content of the Google verification file (as a plain string)
     verification_content = 'google-site-verification: google51f4be664899794b6.html'
+    
+    # Content for the Thank You redirect page
     thankyou_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,8 +163,8 @@ def get_thankyou_content(user_login, repo_name):
     <style>
         body {{
             font-family: Arial, sans-serif;
-            background: #0a0a0f;
-            color: #ffffff;
+            background: #1e293b;
+            color: #f8fafc;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -51,228 +173,86 @@ def get_thankyou_content(user_login, repo_name):
             text-align: center;
         }}
         h1 {{
-            color: #00d4ff;
+            color: #38bdf8;
         }}
         a {{
-            color: #00d4ff;
+            color: #38bdf8;
             text-decoration: none;
             font-weight: bold;
+        }}
+        a:hover {{
+            text-decoration: underline;
         }}
     </style>
 </head>
 <body>
     <div>
         <h1>Thank you for contacting us!</h1>
-        <p>Redirecting you back to the new guild homepage...</p>
-        <a href="{redirect_url}">Click here if you are not redirected</a>
+        <p>Redirecting you back to our homepage...</p>
+        <a href="index.html">Click here if you are not redirected</a>
     </div>
 </body>
 </html>"""
     return verification_content, thankyou_html
 
-# ***************************************************************
-# --- NEW DATA ACQUISITION FUNCTIONS ---
-# ***************************************************************
-
-def get_wikipedia_summary(city):
-    """Function 7: Fetches a short summary paragraph about the city from Wikipedia."""
-    try:
-        # Set to find 3 sentences max
-        # It's crucial to remove or clean up the city name if it contains state/country info for best wiki results.
-        clean_city = city.split(',')[0].strip()
-        summary = wikipedia.summary(clean_city, sentences=3, auto_suggest=True, redirect=True)
-        # Ensure newlines are replaced with spaces for proper HTML insertion
-        return summary.replace('\n', ' ')
-    except (wikipedia.exceptions.PageError, wikipedia.exceptions.DisambiguationError):
-        return f"Welcome to {city}! This is where ordinary people become extraordinary creators. The Titan Software Guild is the future."
-    except Exception as e:
-        print(f"Error fetching Wikipedia data for {city}: {e}")
-        return f"Welcome to {city}! This is where ordinary people become extraordinary creators. The Titan Software Guild is the future."
-
-def get_lat_lon(city):
-    """Function 1: Fetches the longitude and latitude for the city."""
-    try:
-        geolocator = Nominatim(user_agent="titan_software_guild_deployer")
-        location = geolocator.geocode(city)
-        if location:
-            # Ensure coordinates are returned as strings for HTML insertion
-            return str(location.latitude), str(location.longitude)
-        return '35.4822', '-97.5215' # Default to OKC coordinates on failure
-    except Exception as e:
-        print(f"Error fetching geolocation for {city}: {e}")
-        return '35.4822', '-97.5215'
-
-def find_local_poi_data(city):
-    """
-    Functions 3, 4, 5, 6: MOCK DATA
-    NOTE: In a live scenario, this must be replaced with a real API call.
-    """
-    # These are MOCK links and names for demonstration. 
-    return {
-        'libraries': [
-            {'name': f'{city} Central Library', 'url': f'https://google.com/search?q={city}+library+1'},
-            {'name': f'North {city} Community Library', 'url': f'https://google.com/search?q={city}+library+2'},
-            {'name': f'{city} Tech Center Library', 'url': f'https://google.com/search?q={city}+library+3'}
-        ],
-        'bars': [
-            {'name': 'The Code Bar & Grill', 'url': f'https://google.com/search?q={city}+bar+1'},
-            {'name': 'The Python Pub', 'url': f'https://google.com/search?q={city}+bar+2'},
-            {'name': 'The Git Grind Coffee', 'url': f'https://google.com/search?q={city}+bar+3'}
-        ],
-        'restaurants': [
-            {'name': 'The Data Diner', 'url': f'https://google.com/search?q={city}+restaurant+1'},
-            {'name': 'The Algorithm Eatery', 'url': f'https://google.com/search?q={city}+restaurant+2'},
-            {'name': 'SQL Steakhouse', 'url': f'https://google.com/search?q={city}+restaurant+3'}
-        ],
-        'barbers': [
-            {'name': f'{city} Slickers Barbershop', 'url': f'https://google.com/search?q={city}+barber+1'},
-            {'name': 'The Fade Factory', 'url': f'https://google.com/search?q={city}+barber+2'},
-            {'name': 'Executive Cuts - {city}', 'url': f'https://google.com/search?q={city}+barber+3'}
-        ],
-        # Function 2: Local Conditions Word
-        'conditions_word': 'Warm and Cloudless' 
-    }
-
-def get_city_data(city):
-    """Compiles all required dynamic data for the city."""
-    wiki_summary = get_wikipedia_summary(city)
-    latitude, longitude = get_lat_lon(city)
-    poi_data = find_local_poi_data(city)
-    return {
-        'wiki_summary': wiki_summary,
-        'latitude': latitude,
-        'longitude': longitude,
-        'poi': poi_data
-    }
-
-def create_list_items(poi_list):
-    """Generates the HTML <li> list items for POI data."""
-    # Ensure this matches the <li> style in your template
-    return ''.join([
-        f'<li><a href="{poi["url"]}" target="_blank" rel="noopener noreferrer" style="color: var(--text-light); text-decoration: none;">**{poi["name"]}**</a></li>'
-        for poi in poi_list
-    ])
-
-# ***************************************************************
-# --- CORE DEPLOYMENT LOGIC MODIFIED ---
-# ***************************************************************
-
 def process_city_deployment(g, user, token, city):
     """Handles the full creation, update, and deployment cycle for a single city."""
-
+    
+    # 3. Define New Repository Details
     repo_name_base = f"{city.replace(' ', '')}"
     new_repo_name = f"{REPO_PREFIX}{repo_name_base}{REPO_SUFFIX}"
     print(f"\n--- STARTING DUPLICATE DEPLOYMENT FOR: {city} ---")
+    print(f"Targeting new repository: {new_repo_name}")
     
+    # 4. Read and Modify HTML Content
     base_html_content = read_file(SOURCE_HTML_FILE)
-    city_data = get_city_data(city)
-
-    # ----------------------------------------------------
-    # CORE MODIFICATIONS TO REFLECT CURRENT CITY
-    # ----------------------------------------------------
-
-    # Function 8 (Base): Replace ALL 'Oklahoma City' occurrences
+    
+    # Get city-specific data
+    print(f"Fetching data for {city}...")
+    lat, lng = get_city_coordinates(city)
+    libraries = get_places_by_type(city, "library")
+    bars = get_places_by_type(city, "bar")
+    restaurants = get_places_by_type(city, "restaurant")
+    barbers = get_places_by_type(city, "barber")
+    wiki_summary = get_wikipedia_summary(city)
+    
+    # Replace the city placeholder and the title
     new_content = base_html_content.replace(SEARCH_TERM, city)
-    
-    # Replace the site title
-    new_site_title = f"The Titan Software Guild: {city} Deployment Hub"
+    new_site_title = f"{REPO_PREFIX.strip('-')} {city} {REPO_SUFFIX.strip('-')}"
     new_content = re.sub(r'<title>.*?</title>', f'<title>{new_site_title}</title>', new_content, flags=re.IGNORECASE)
-
-    # Function 7: Replace Wiki Paragraph (The Greatest Time in Human History section)
-    # The erroneous text that needs to be replaced is the long OKC description.
-    # We use re.escape to handle all special characters in the source text.
-    okc_wiki_block_template = r'Oklahoma City is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.'
     
-    # Since the full block includes the two sentences before and after, we capture the entire block:
-    wiki_block_full_pattern = r'(<p class="mission-text">)(.*?)(</p>)' # This targets the second <p> inside <section class="mission">
+    # 1. Replace longitude & latitude
+    new_content = re.sub(r'data-lat="[^"]*"', f'data-lat="{lat}"', new_content)
+    new_content = re.sub(r'data-lng="[^"]*"', f'data-lng="{lng}"', new_content)
     
-    # We MUST ensure the regex only targets the paragraph containing the OKC description.
-    # The snippet you provided: "Austin-Texas (OKC) is the capital and largest city..." is the *result* of a failed replace.
-    # We target the *original* text using the provided template text.
+    # 2. Replace current local conditions (assuming there's a section for this)
+    # This would depend on your HTML structure - you might need to adjust the selectors
     
-    # FIX: Use re.escape on the entire template text block to ensure a direct match.
-    okc_wiki_block_original = r'Oklahoma City is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.'
-
-    # Use a generic approach that handles potential whitespace/formatting issues around the target text block:
-    # Look for the opening <p> tag and ensure we only replace the content of the second mission-text <p>.
+    # 3. Replace libraries section
+    libraries_html = create_libraries_section(libraries)
+    new_content = replace_html_section(new_content, 'libraries', libraries_html)
     
-    # 1. Split the content to get the two <p> blocks under the mission section.
-    mission_text_pattern = r'(<p class="mission-text">.*?)</p>'
-    mission_paragraphs = re.findall(mission_text_pattern, new_content, re.DOTALL)
+    # 4. Replace bars section
+    bars_html = create_bars_section(bars)
+    new_content = replace_html_section(new_content, 'bars', bars_html)
     
-    if len(mission_paragraphs) >= 2:
-        # We replace the content of the SECOND paragraph (index 1) which contains the city description.
-        # This replaces the text *inside* the <p> tag but preserves the tags themselves.
-        target_paragraph = mission_paragraphs[1]
-        
-        # Replace the content of that target paragraph with the new wiki summary
-        new_target_paragraph = f'<p class="mission-text">{city_data["wiki_summary"]}</p>'
-        
-        # We must use a full string replacement since the regex is complex to manage nesting.
-        # Find the original, static content of the target paragraph (after replacing the general 'Oklahoma City' name)
-        # We assume the second mission-text paragraph contains the text starting with the city name.
-        
-        # Find the full block of the original OKC wiki description after general city replacements
-        # Since 'Oklahoma City' is replaced with the new city name, we search for the *new* city name
-        # followed by the static rest of the paragraph.
-        
-        # This is a robust targeted string replacement:
-        new_content = new_content.replace(
-            f'{city} is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.',
-            city_data['wiki_summary']
-        )
-
-    print("Function 7: Replaced Wikipedia summary block.")
-
-    # Function 2: Replace Current Local Conditions Word
-    weather_placeholder = r'☀️ 75°F <span>Humidity: 45% \| \*\*2:44 PM CDT\*\*</span>'
-    new_conditions = f'{city_data["poi"]["conditions_word"]} <span>Check local weather for details.</span>'
-
-    new_content = re.sub(
-        weather_placeholder, 
-        re.escape(new_conditions),
-        new_content
-    )
-    print(f"Function 2: Replaced local conditions with: {city_data['poi']['conditions_word']}")
-
-    # Functions 3, 4, 5, 6: Replace POI Links inside the <ul> tags (Robust method)
-    # Map: (ul_class, poi_data_key) -> ul_class must match template.html
-    poi_map = [
-        ('library-list', 'libraries'),  # Function 3
-        ('jobs-list', 'bars'),          # Function 4 (Misleading class name used in template)
-        ('news-list', 'restaurants'),   # Function 5 (Misleading class name used in template)
-        ('barber-list', 'barbers')      # Function 6
-    ]
-
-    for ul_class, data_key in poi_map:
-        new_list_html = create_list_items(city_data['poi'][data_key])
-        
-        ul_pattern = rf'(<ul class="{re.escape(ul_class)}">)(.*?)(</ul>)'
-        
-        new_content = re.sub(
-            ul_pattern, 
-            r'\1' + new_list_html + r'\3', 
-            new_content, 
-            flags=re.DOTALL | re.IGNORECASE
-        )
-        print(f"Function {poi_map.index((ul_class, data_key)) + 3}: Replaced POI list for {data_key.capitalize()}.")
-
-
-    # Function 1: Replace longitude & latitude 
-    # Assumes <input type="hidden" id="deploy-lat" value="35.4822"> exists near the footer
-    lat_search_pattern = r'(id="deploy-lat"\s*value=")([^"]*)(")'
-    lon_search_pattern = r'(id="deploy-lon"\s*value=")([^"]*)(")'
+    # 5. Replace restaurants section
+    restaurants_html = create_restaurants_section(restaurants)
+    new_content = replace_html_section(new_content, 'restaurants', restaurants_html)
     
-    new_content = re.sub(lat_search_pattern, r'\1' + city_data['latitude'] + r'\3', new_content)
-    new_content = re.sub(lon_search_pattern, r'\1' + city_data['longitude'] + r'\3', new_content)
-    print("Function 1: Replaced Longitude and Latitude values.")
-
-    # ----------------------------------------------------
-    # END CORE MODIFICATIONS
-    # ----------------------------------------------------
-
-    # 5. Connect to GitHub and Create/Get Repo (Remaining code for GitHub logic)
+    # 6. Replace barbers section
+    barbers_html = create_barbers_section(barbers)
+    new_content = replace_html_section(new_content, 'barbers', barbers_html)
     
+    # 7. Replace Wikipedia section
+    wiki_pattern = r'<div[^>]*id=["\']wikipedia["\'][^>]*>.*?</div>'
+    wiki_replacement = f'<div id="wikipedia"><p>{wiki_summary}</p></div>'
+    new_content = re.sub(wiki_pattern, wiki_replacement, new_content, flags=re.DOTALL)
+    
+    # 8. Any remaining Oklahoma City references
+    new_content = new_content.replace('Oklahoma City', city)
+    
+    # 5. Connect to GitHub and Create/Get Repo
     repo = None
     try:
         # Get or Create Repository
@@ -326,7 +306,6 @@ def process_city_deployment(g, user, token, city):
             repo.create_file(path="index.html", message=f"Initial site deployment for {city}", content=new_content, branch="main")
         print("Committed updated index.html to the new repository.")
 
-        
         # 7. Enable GitHub Pages using direct requests API call
         pages_api_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
         headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'}
@@ -349,20 +328,21 @@ def process_city_deployment(g, user, token, city):
             pages_url = json.loads(r.text).get('html_url', 'URL not yet active or failed to retrieve.')
         except:
             pages_url = 'URL failed to retrieve, check repo settings manually.'
+
         print(f"Final Repository URL: {repo.html_url}")
         print(f"Live site URL: {pages_url}")
         print(f"--- {city} DUPLICATE DEPLOYMENT COMPLETE ---")
 
     except Exception as e:
         print(f"A critical error occurred during {city} duplicate deployment: {e}")
-        pass 
+        pass # Allow other cities to proceed
 
 
 def main():
     """Main execution function to loop through all cities."""
     
     token = os.environ.get('GH_TOKEN')
-    delay = float(os.environ.get('DEPLOY_DELAY', 200)) 
+    delay = float(os.environ.get('DEPLOY_DELAY', 180)) # Default 180 seconds (3 mins)
 
     if not token:
         raise EnvironmentError("Missing GH_TOKEN environment variable. Cannot proceed.")

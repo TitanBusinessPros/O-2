@@ -4,16 +4,19 @@ import json
 import requests
 from github import Github
 from time import sleep
+# Required for Functions 1, 2, 7 (city data fetching)
 import wikipedia
 from geopy.geocoders import Nominatim
 
 # --- Configuration ---
-# RENAMED TO ALIGN WITH UPLOADED FILE (assuming the master template is named 'template.html')
+# Uses 'template.html' as the primary source file, with a fallback to 'index.html'
 SOURCE_HTML_FILE = 'template.html' 
-OUTPUT_HTML_FILE = 'index.html' # The file that GitHub Pages serves
+OUTPUT_HTML_FILE = 'index.html' 
 CITIES_FILE = 'new.txt' 
 SEARCH_TERM = 'Oklahoma City' 
+# Original text block to be replaced by Wikipedia summary (Function 7)
 ORIGINAL_WIKI_BLOCK = 'Oklahoma City is famous for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA\'s Thunder team.'
+# Placeholder text to be replaced (Function 2)
 WEATHER_PLACEHOLDER = r'☀️ 75°F <span>Humidity: 45% \| \*\*2:44 PM CDT\*\*</span>'
 REPO_PREFIX = 'The-'
 REPO_SUFFIX = '-Software-Guild'
@@ -22,16 +25,17 @@ THANKYOU_FILE_NAME = 'thankyou.html'
 # ---------------------
 
 def read_file(filename):
-    """Reads the content of a file."""
+    """Reads the content of a file, with a fallback check for 'index.html'."""
     if not os.path.exists(filename):
-        # Fallback in case user renamed 'template.html' to 'index.html'
         if filename == 'template.html' and os.path.exists('index.html'):
-            return read_file('index.html')
-        raise FileNotFoundError(f"Required source HTML file not found: {filename}")
+            print(f"Using 'index.html' as source, as '{filename}' was not found.")
+            filename = 'index.html'
+        else:
+            raise FileNotFoundError(f"Required source HTML file not found: {filename}")
+            
     with open(filename, 'r', encoding='utf-8') as f:
         return f.read()
 
-# ... (get_thankyou_content, get_wikipedia_summary, get_lat_lon, find_local_poi_data, get_city_data, create_list_items remain correct) ...
 def get_thankyou_content(user_login, repo_name):
     """Generates the thank you HTML with the correct, dynamic redirect URL."""
     redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html"
@@ -76,8 +80,9 @@ def get_thankyou_content(user_login, repo_name):
     return verification_content, thankyou_html
 
 def get_wikipedia_summary(city):
-    """Function 7: Fetches a short summary paragraph about the city from Wikipedia."""
+    """Function 7: Fetches a short summary paragraph about the city. Uses only City name for better lookup."""
     try:
+        # Use only the city name for a cleaner Wikipedia search
         clean_city = city.split(',')[0].strip()
         summary = wikipedia.summary(clean_city, sentences=3, auto_suggest=True, redirect=True)
         return summary.replace('\n', ' ')
@@ -88,9 +93,10 @@ def get_wikipedia_summary(city):
         return f"Welcome to {city}! This is where ordinary people become extraordinary creators. The Titan Software Guild is the future."
 
 def get_lat_lon(city):
-    """Function 1: Fetches the longitude and latitude for the city."""
+    """Function 1: Fetches the longitude and latitude. Uses full City, State for precision."""
     try:
         geolocator = Nominatim(user_agent="titan_software_guild_deployer")
+        # Pass the full city, state string to geolocator for best results
         location = geolocator.geocode(city)
         if location:
             return str(location.latitude), str(location.longitude)
@@ -101,8 +107,9 @@ def get_lat_lon(city):
 
 def find_local_poi_data(city):
     """
-    Functions 3, 4, 5, 6: MOCK DATA
+    Functions 3, 4, 5, 6: MOCK DATA. Uses full City, State in search queries.
     """
+    # ... (mock data generation remains the same) ...
     return {
         'libraries': [
             {'name': f'{city} Central Library', 'url': f'https://google.com/search?q={city}+library+1'},
@@ -205,22 +212,28 @@ def process_city_deployment(g, user, token, city):
         print(f"Function {poi_map.index((ul_class, data_key)) + 3}: Replaced POI list for {data_key.capitalize()}.")
 
 
-    # Function 1 (CRITICAL FIX): Replace/Insert longitude & latitude 
+    # Function 1 (FIXED): Replace/Insert longitude & latitude 
     lat_search_pattern = r'(id="deploy-lat"\s*value=")([^"]*)(")'
     lon_search_pattern = r'(id="deploy-lon"\s*value=")([^"]*)(")'
     
-    # 1. Attempt replacement (if tags exist)
-    lat_replaced = re.sub(lat_search_pattern, r'\1' + city_data['latitude'] + r'\3', new_content)
-    lon_replaced = re.sub(lon_search_pattern, r'\1' + city_data['longitude'] + r'\3', lat_replaced)
+    # Use callable for replacement to treat data as literal text (fixes re.PatternError)
+    def lat_replacer(match):
+        return match.group(1) + city_data['latitude'] + match.group(3)
+
+    def lon_replacer(match):
+        return match.group(1) + city_data['longitude'] + match.group(3)
+
+    # 1. Attempt replacement and count the occurrences
+    lat_replaced, lat_count = re.subn(lat_search_pattern, lat_replacer, new_content)
+    lon_replaced, lon_count = re.subn(lon_search_pattern, lon_replacer, lat_replaced)
     
-    # 2. Check if replacement occurred (if patterns match, re.sub returns a different string)
-    if new_content == lon_replaced:
-        # If no replacement occurred, the hidden inputs are missing. Insert them before </body>.
+    new_content = lon_replaced
+
+    # 2. Check if insertion is needed (if tags did not exist)
+    if lat_count == 0 or lon_count == 0:
         print("Warning: Coordinate input tags not found. Inserting them before </body>.")
         coordinate_inputs = f'\n<input type="hidden" id="deploy-lat" value="{city_data["latitude"]}">\n<input type="hidden" id="deploy-lon" value="{city_data["longitude"]}">\n'
         new_content = re.sub(r'(</body>)', coordinate_inputs + r'\1', new_content, flags=re.IGNORECASE)
-    else:
-        new_content = lon_replaced
 
     print("Function 1: Replaced/Inserted Longitude and Latitude values.")
 
@@ -228,7 +241,7 @@ def process_city_deployment(g, user, token, city):
     # END CORE MODIFICATIONS
     # ----------------------------------------------------
 
-    # 5. Connect to GitHub and Create/Get Repo (Simplified for output)
+    # 5. Connect to GitHub and Create/Get Repo (Deployment Logic)
     repo = None
     try:
         # Get or Create Repository
@@ -258,7 +271,7 @@ def process_city_deployment(g, user, token, city):
         commit_file(THANKYOU_FILE_NAME, "Update thankyou redirect file", thankyou_html)
         commit_file(".nojekyll", "Add .nojekyll to enable direct HTML serving", "")
         
-        # The key change: Commit the MODIFIED content to the final 'index.html' file
+        # Commit the MODIFIED content to the final 'index.html' file
         commit_file(OUTPUT_HTML_FILE, f"Update site content for {city}", new_content)
         print(f"Committed MODIFIED {OUTPUT_HTML_FILE} to the new repository.")
 
@@ -268,34 +281,33 @@ def process_city_deployment(g, user, token, city):
         headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'}
         data = {'source': {'branch': 'main', 'path': '/'}}
         
-        # Use PUT to ensure configuration is active and set to 'main'
+        # Use PUT (update) then POST (create) for reliable configuration
         r = requests.put(pages_api_url, headers=headers, json=data)
+        if r.status_code not in [201, 204]:
+            r = requests.post(pages_api_url, headers=headers, json=data)
+
         if r.status_code in [201, 204]:
             print("Successfully configured GitHub Pages (New Site).")
         else:
-            # If the PUT/POST fails, try a GET request to ensure the URL is retrieved anyway
-            print(f"Warning: Pages configuration status code: {r.status_code}")
+            print(f"Warning: Pages configuration failed. Status Code: {r.status_code}")
+
 
         # 8. Fetch and Display Final URL
         pages_info_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
         r = requests.get(pages_info_url, headers=headers)
         
+        # Fallback to calculated URL if API retrieval fails
         try:
-            pages_url = json.loads(r.text).get('html_url', 'URL not yet active or failed to retrieve.')
+            pages_url = json.loads(r.text).get('html_url', f"https://{user.login}.github.io/{new_repo_name}/")
         except:
-            pages_url = 'URL failed to retrieve, check repo settings manually.'
-        
-        # Final confirmation of URL
-        if pages_url == 'URL not yet active or failed to retrieve.':
-             pages_url = f"https://{user.login}.github.io/{new_repo_name}/"
-             print(f"Note: API failed to return URL. Calculated URL is: {pages_url}")
-             
+            pages_url = f"https://{user.login}.github.io/{new_repo_name}/"
+            
         print(f"Live site URL: {pages_url}")
         print(f"--- {city} DUPLICATE DEPLOYMENT COMPLETE ---")
 
     except Exception as e:
         print(f"A critical error occurred during {city} duplicate deployment: {e}")
-        pass # Allow other cities to proceed
+        pass 
 
 
 def main():

@@ -26,15 +26,13 @@ jobs:
         python-version: '3.x'
 
     - name: 3. Install Required Python Libraries
-      run: pip install PyGithub requests
+      # Installs PyGithub, requests, wikipedia (for Function 7), and geopy (for Function 1)
+      run: pip install PyGithub requests wikipedia geopy
       
     - name: 4. Run Script to Create & Deploy ALL Repos
       env:
-        # REFERENCE TO THE NEW SECRET
-        GH_TOKEN: ${{ secrets.new7 }}
-        # API Keys for location services
-        OPENCAGE_API_KEY: ${{ secrets.OPENCAGE_API_KEY }}
-        GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+        # This SECRET must contain your GitHub Personal Access Token
+        GH_TOKEN: ${{ secrets.new7 }} 
         # Set the required delay between repo creations (in seconds)
-        DEPLOY_DELAY: 180 
+        DEPLOY_DELAY: 200 
       run: python new_website_updater.py

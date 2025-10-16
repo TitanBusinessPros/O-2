@@ -10,23 +10,24 @@ from time import sleep
 
 # --- Configuration ---
 SOURCE_HTML_FILE = 'index.html'
-CITIES_FILE = 'new.txt'  # REFERENCE TO THE NEW TXT FILE [cite: 21]
-SEARCH_TERM = 'Oklahoma City'  # Placeholder to be replaced [cite: 21]
-REPO_PREFIX = 'The-'
-REPO_SUFFIX = '-Software-Guild'
-VERIFICATION_FILE_NAME = 'google51f4be664899794b6.html'
-THANKYOU_FILE_NAME = 'thankyou.index'
+[cite_start]CITIES_FILE = 'new.txt'  # REFERENCE TO THE NEW TXT FILE [cite: 21]
+[cite_start]SEARCH_TERM = 'Oklahoma City'  # Placeholder to be replaced [cite: 21]
+[cite_start]REPO_PREFIX = 'The-' [cite: 21]
+[cite_start]REPO_SUFFIX = '-Software-Guild' [cite: 21]
+[cite_start]VERIFICATION_FILE_NAME = 'google51f4be664899794b6.html' [cite: 21]
+[cite_start]THANKYOU_FILE_NAME = 'thankyou.index' [cite: 21]
 # ---------------------
 
 # --- API & Helper Functions ---
 
 def get_api_data(query, api_key):
     """Generic function to fetch data from Google Places and Geocoding APIs."""
+    # [cite_start]This function is used to fetch the three libraries, three bars, three restaurants, and three barber shops. [cite: 6, 8, 10, 13]
     base_url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {'query': query, 'key': api_key}
     try:
         response = requests.get(base_url, params=params)
-        response.raise_for_status()  # Raise an exception for bad status codes
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"API request failed for query '{query}': {e}")
@@ -34,6 +35,7 @@ def get_api_data(query, api_key):
 
 def get_city_coords(city, api_key):
     """Fetches longitude and latitude for a city using Google Geocoding."""
+    # [cite_start]This function implements requirement 1. [cite: 3]
     query = f"{city}"
     geo_url = f"https://maps.googleapis.com/maps/api/geocode/json"
     params = {'address': query, 'key': api_key}
@@ -50,6 +52,7 @@ def get_city_coords(city, api_key):
 
 def get_wikipedia_summary(city):
     """Fetches the introductory paragraph for a city from Wikipedia."""
+    # [cite_start]This function implements requirement 7. [cite: 15, 16, 17]
     wiki = wikipediaapi.Wikipedia('CityInfoBot/1.0', 'en')
     page = wiki.page(city)
     if page.exists():
@@ -60,7 +63,7 @@ def get_wikipedia_summary(city):
 def create_html_list(items, not_found_message="No locations found."):
     """Creates an HTML list from a list of items."""
     if not items:
-        return f"<li>{not_found_message}</li>"
+        return f'<li>{not_found_message}</li>'
     return ''.join([f'<li>{item}</li>' for item in items])
 
 def read_file(filename):
@@ -68,19 +71,19 @@ def read_file(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"Required file not found: {filename}")
     with open(filename, 'r', encoding='utf-8') as f:
-        return f.read()
+        [cite_start]return f.read() [cite: 21]
 
 def get_thankyou_content(user_login, repo_name):
-    """Generates the thank you HTML with the correct, dynamic redirect URL.""" [cite: 22]
-    redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html"
-    verification_content = 'google-site-verification: google51f4be664899794b6.html'
+    """Generates the thank you HTML with the correct, dynamic redirect URL."""
+    [cite_start]redirect_url = f"https://{user_login}.github.io/{repo_name}/index.html" [cite: 22]
+    [cite_start]verification_content = 'google-site-verification: google51f4be664899794b6.html' [cite: 22]
     thankyou_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Thank You!</title>
-    <meta http-equiv="refresh" content="0; url={redirect_url}"> [cite: 23]
+    <meta http-equiv="refresh" content="0; url={redirect_url}">
 </head>
 <body>
     <h1>Thank you for contacting us!</h1>
@@ -99,25 +102,30 @@ def process_city_deployment(g, user, token, city):
 
     google_api_key = os.environ.get('GOOGLE_API_KEY')
     if not google_api_key:
+        # Note: This warning is shown in the output, indicating the key must be set as a secret.
         print("Warning: GOOGLE_API_KEY environment variable not set. Dynamic content will be skipped.")
         
-    # Read and perform initial city name replacement
-    base_html_content = read_file(SOURCE_HTML_FILE)
-    new_content = base_html_content.replace(SEARCH_TERM, city) [cite: 27]
-    new_site_title = f"{REPO_PREFIX.strip('-')} {city} {REPO_SUFFIX.strip('-')}"
-    new_content = re.sub(r'<title>.*?</title>', f'<title>{new_site_title}</title>', new_content, flags=re.IGNORECASE)
+    # Read and perform initial city name replacement (Requirement 8)
+    [cite_start]base_html_content = read_file(SOURCE_HTML_FILE) [cite: 27]
+    
+    # 💥 FIXED: Removed the erroneous citation placeholder from this line
+    new_content = base_html_content.replace(SEARCH_TERM, city)
+    
+    [cite_start]new_site_title = f"{REPO_PREFIX.strip('-')} {city} {REPO_SUFFIX.strip('-')}" [cite: 27]
+    [cite_start]new_content = re.sub(r'<title>.*?</title>', f'<title>{new_site_title}</title>', new_content, flags=re.IGNORECASE) [cite: 27]
 
     # --- NEW: Fetch and Replace Dynamic Content ---
     if google_api_key:
-        # 1. Replace Lat/Lon 
+        print("Fetching dynamic content...")
+        # 1. Replace Lat/Lon (Requirement 1)
         lat, lon = get_city_coords(city, google_api_key)
         new_content = re.sub(r'', str(lat), new_content)
         new_content = re.sub(r'', str(lon), new_content)
         
-        # 2. Replace Local Conditions 
-        new_content = re.sub(r'', f'Current Conditions in {city}', new_content)
+        # 2. Replace Local Conditions (Requirement 2)
+        [cite_start]new_content = re.sub(r'', f'Current Conditions in {city}', new_content) [cite: 4, 5]
         
-        # 3. Replace Libraries, Bars, Restaurants, Barbers 
+        # 3. Replace Lists: Libraries, Bars, Restaurants, Barbers (Requirements 3, 4, 5, 6)
         place_types = {
             'libraries': ('libraries in', 'library-list'),
             'bars': ('bars in', 'bar-list'),
@@ -133,28 +141,29 @@ def process_city_deployment(g, user, token, city):
             pattern = re.compile(f'(<ul id="{element_id}">)(.*?)(</ul>)', re.DOTALL)
             new_content = pattern.sub(f'\\1{html_list}\\3', new_content)
             
-        # 4. Replace Wikipedia Paragraph [cite: 16, 17]
+        # 4. Replace Wikipedia Paragraph (Requirement 7)
         wiki_summary = get_wikipedia_summary(city)
         pattern = re.compile(f'(<p id="wiki-summary">)(.*?)(</p>)', re.DOTALL)
         new_content = pattern.sub(f'\\1{wiki_summary}\\3', new_content)
 
-    # Connect to GitHub and Create/Get Repo
+    # 5. Connect to GitHub and Create/Get Repo
+    repo = None
     try:
         try:
-            repo = user.get_repo(new_repo_name)
-            print(f"Repository already exists. Proceeding to update.") [cite: 28-29]
+            [cite_start]repo = user.get_repo(new_repo_name) [cite: 28]
+            [cite_start]print(f"Repository already exists. Proceeding to update.") [cite: 29]
         except Exception:
             print(f"Repository does not exist. Creating new repository.")
-            repo = user.create_repo(name=new_repo_name, private=False, auto_init=True) [cite: 30]
+            [cite_start]repo = user.create_repo(name=new_repo_name, private=False, auto_init=True) [cite: 30]
             sleep(5) 
 
         verification_content, thankyou_html = get_thankyou_content(user.login, new_repo_name)
         
         # Commit verification and thankyou files
         for path, content, msg in [
-            (VERIFICATION_FILE_NAME, verification_content, "Add/Update Google verification file"),
-            (THANKYOU_FILE_NAME, thankyou_html, "Add/Update thankyou redirect page"),
-            (".nojekyll", "", "Add/Update .nojekyll file")
+            (VERIFICATION_FILE_NAME, verification_content, "Add/Update Google verification file")[cite_start], [cite: 31]
+            (THANKYOU_FILE_NAME, thankyou_html, "Add/Update thankyou redirect page")[cite_start], [cite: 32]
+            (".nojekyll", "", "Add/Update .nojekyll file") [cite_start][cite: 33]
         ]:
             try:
                 contents = repo.get_contents(path, ref="main")
@@ -163,30 +172,30 @@ def process_city_deployment(g, user, token, city):
                 repo.create_file(path, msg, content, branch="main")
             print(f"Committed {path}.")
 
-        # Commit the generated index.html [cite: 34]
+        # Commit the generated index.html
         try:
-            contents = repo.get_contents("index.html", ref="main")
-            repo.update_file("index.html", f"Update site content for {city}", new_content, contents.sha, branch="main")
+            [cite_start]contents = repo.get_contents("index.html", ref="main") [cite: 34]
+            [cite_start]repo.update_file("index.html", f"Update site content for {city}", new_content, contents.sha, branch="main") [cite: 34]
         except Exception:
-            repo.create_file("index.html", f"Initial site deployment for {city}", new_content, branch="main")
+            [cite_start]repo.create_file("index.html", f"Initial site deployment for {city}", new_content, branch="main") [cite: 34]
         print("Committed updated index.html to the new repository.")
 
-        # Enable GitHub Pages [cite: 35]
-        pages_api_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages"
-        headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'}
-        data = {'source': {'branch': 'main', 'path': '/'}}
-        response = requests.post(pages_api_url, headers=headers, json=data)
+        # 6. Enable GitHub Pages
+        [cite_start]pages_api_url = f"https://api.github.com/repos/{user.login}/{new_repo_name}/pages" [cite: 35]
+        [cite_start]headers = {'Accept': 'application/vnd.github.v3+json', 'Authorization': f'token {token}'} [cite: 35]
+        [cite_start]data = {'source': {'branch': 'main', 'path': '/'}} [cite: 35]
+        [cite_start]response = requests.post(pages_api_url, headers=headers, json=data) [cite: 35]
         if response.status_code == 201:
-            print("Successfully configured GitHub Pages.") [cite: 36]
+            [cite_start]print("Successfully configured GitHub Pages.") [cite: 36]
         elif response.status_code == 409: # Already exists, so update
             requests.put(pages_api_url, headers=headers, json=data)
-            print("Successfully updated GitHub Pages configuration.")
+            [cite_start]print("Successfully updated GitHub Pages configuration.") [cite: 36]
         
-        # Fetch and Display Final URL
-        sleep(10) # Wait a moment for the URL to be available
-        r = requests.get(pages_api_url, headers=headers) [cite: 37]
+        # 7. Fetch and Display Final URL
+        sleep(10)
+        [cite_start]r = requests.get(pages_api_url, headers=headers) [cite: 37]
         pages_url = r.json().get('html_url', 'URL not yet active.')
-        print(f"Final Repository URL: {repo.html_url}") [cite: 38]
+        [cite_start]print(f"Final Repository URL: {repo.html_url}") [cite: 38]
         print(f"Live site URL: {pages_url}")
         print(f"--- {city} DEPLOYMENT COMPLETE ---")
 
@@ -195,26 +204,31 @@ def process_city_deployment(g, user, token, city):
 
 def main():
     """Main execution function to loop through all cities."""
-    token = os.environ.get('GH_TOKEN')
-    delay = float(os.environ.get('DEPLOY_DELAY', 180))
+    [cite_start]token = os.environ.get('GH_TOKEN') [cite: 39]
+    [cite_start]delay = float(os.environ.get('DEPLOY_DELAY', 180)) [cite: 39]
 
     if not token:
-        raise EnvironmentError("Missing GH_TOKEN environment variable.") [cite: 39]
+        [cite_start]raise EnvironmentError("Missing GH_TOKEN environment variable.") [cite: 39]
 
-    cities = [c.strip() for c in read_file(CITIES_FILE).splitlines() if c.strip()]
+    [cite_start]cities = [c.strip() for c in read_file(CITIES_FILE).splitlines() if c.strip()] [cite: 39]
     if not cities:
         print(f"Error: {CITIES_FILE} is empty.")
         return
 
+    # [cite_start]Initialize GitHub connection (once) [cite: 40]
     try:
-        g = Github(token)
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            g = Github(token)
         user = g.get_user()
     except Exception as e:
         raise ConnectionError(f"Failed to connect to GitHub API: {e}")
 
+    # [cite_start]Iterate through all cities with a delay [cite: 41]
     for i, city in enumerate(cities):
         if i > 0:
-            print(f"\n--- PAUSING for {delay} seconds before next deployment... ---") [cite: 41]
+            [cite_start]print(f"\n--- PAUSING for {delay} seconds before next deployment... ---") [cite: 41]
             sleep(delay)
         process_city_deployment(g, user, token, city)
     

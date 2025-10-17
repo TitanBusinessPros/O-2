@@ -256,7 +256,7 @@ def process_city_deployment(g, user, token, city_name):
     html_content = replace_in_content(html_content, "OKC", city_name)
     
     # b. Lat/Lon for weather updater
-    # FIX: Correct placeholders for Latitude and Longitude (lines 257-258)
+    # !!! THIS IS THE FIX: Replacing "" with the correct placeholder "" !!!
     html_content = replace_in_content(html_content, "", str(lat))
     html_content = replace_in_content(html_content, "", str(lon))
     

@@ -214,12 +214,20 @@ def deploy_to_github(repo_name, content):
             repo.create_file("index.html", f"Deploy {repo_name}", content)
             debug_log("✓ Created index.html")
         
-        # Try to enable GitHub Pages (may not work with GITHUB_TOKEN)
+        # Enable GitHub Pages using the API
         try:
-            repo.edit(has_pages=True)
-            debug_log("✓ Enabled GitHub Pages")
-        except Exception as e:
-            debug_log(f"Note: May need manual Pages setup: {str(e)}")
+            # First, check if Pages is already enabled
+            pages_info = repo.get_pages()
+            debug_log(f"✓ GitHub Pages already enabled: {pages_info.url}")
+        except:
+            # If not enabled, try to enable it
+            try:
+                repo.create_pages_site(branch="main", path="/")
+                debug_log("✓ Enabled GitHub Pages via API")
+            except Exception as e:
+                debug_log(f"Note: May need manual Pages setup: {str(e)}")
+                debug_log(f"Go to: https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
+                debug_log("Select 'Deploy from a branch' and choose 'main' branch")
         
         debug_log("✅ DEPLOYMENT SUCCESSFUL!")
         debug_log(f"📁 Repository: https://github.com/TitanBusinessPros/{repo_name}")
@@ -266,9 +274,6 @@ def main():
     repo_name = f"The-{city_name}-Software-Guild"
     if deploy_to_github(repo_name, content):
         debug_log(f"🎉 {city_name} successfully deployed!")
-        debug_log("🔧 If GitHub Pages isn't auto-enabled, go to:")
-        debug_log(f"   https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
-        debug_log("   Select 'Deploy from a branch' and choose 'main' branch")
     else:
         debug_log("❌ Deployment failed")
 

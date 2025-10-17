@@ -38,16 +38,16 @@ jobs:
         if [ ! -f new.txt ]; then
           echo "Creating new.txt with sample cities..."
           cat > new.txt << EOF
-        Dallas
-        Austin
-        Houston
-        EOF
+Dallas
+Austin
+Houston
+EOF
         fi
         echo "Contents of new.txt:"
         cat new.txt
 
     - name: 5. Run City Deployer Script
-      run: python new_website_updater.py
+      run: python new_website_deployer.py
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -59,3 +59,16 @@ jobs:
         pwd
         echo "Files in current directory:"
         ls -la
+        echo "Checking if Python file exists:"
+        if [ -f new_website_deployer.py ]; then
+          echo "✓ new_website_deployer.py exists"
+        else
+          echo "✗ new_website_deployer.py not found"
+        fi
+        if [ -f new.txt ]; then
+          echo "✓ new.txt exists"
+          echo "Contents:"
+          cat new.txt
+        else
+          echo "✗ new.txt not found"
+        fi

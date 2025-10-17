@@ -1,9 +1,7 @@
 name: Deploy City Website
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   deploy:
@@ -34,14 +32,6 @@ jobs:
         
     - name: Deploy website
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT }}  # Use your PAT named "NEW7"
       run: |
         python new_website_deployer.py
-        
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-      
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: '.'

@@ -2,10 +2,9 @@ import os
 import sys
 import requests
 import json
-import re
-import base64
 import time
 import datetime
+import base64
 from github import Github
 from textwrap import dedent
 
@@ -234,9 +233,9 @@ def process_city_deployment(g, user, token, city_name):
     html_content = replace_in_content(html_content, "Oklahoma City", city_name)
     html_content = replace_in_content(html_content, "OKC", city_name)
     
-    # b. Replace latitude and longitude (assuming placeholders exist in template)
-    html_content = replace_in_content(html_content, "35.4676", str(lat))  # Default OKC lat
-    html_content = replace_in_content(html_content, "-97.5164", str(lon))  # Default OKC lon
+    # b. Replace latitude and longitude
+    html_content = replace_in_content(html_content, "35.4676", str(lat))
+    html_content = replace_in_content(html_content, "-97.5164", str(lon))
     
     # c. Replace Wikipedia summary
     original_okc_paragraph = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
@@ -252,7 +251,7 @@ def process_city_deployment(g, user, token, city_name):
     osm_citation = "© OpenStreetMap contributors"
     html_content = replace_in_content(html_content, "<!-- OSM_CITATION_PLACEHOLDER -->", osm_citation)
     
-    noaa_citation = "Weather data provided by NOAA"
+    noaa_citation = "NOAA National Weather Service"
     html_content = replace_in_content(html_content, "<!-- NOAA_CITATION_PLACEHOLDER -->", noaa_citation)
 
     # 6. REPOSITORY CREATION/UPDATE

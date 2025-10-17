@@ -2,8 +2,9 @@
 import requests
 import time
 import os
-from github import Github
+import json
 from datetime import datetime
+from github import Github, Auth
 
 def debug_log(message):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
@@ -23,13 +24,23 @@ def geocode_city_fixed(city_name):
     """Force correct major city detection"""
     debug_log(f"Geocoding: {city_name}")
     
-    # MAJOR FIX: Hardcode coordinates for major cities to avoid wrong detection
+    # Hardcode coordinates for major cities to avoid wrong detection
     major_cities = {
         "Nashville": {"lat": "36.1627", "lon": "-86.7816", "display_name": "Nashville, Tennessee, USA"},
         "Detroit": {"lat": "42.3314", "lon": "-83.0458", "display_name": "Detroit, Michigan, USA"},
         "Dallas": {"lat": "32.7767", "lon": "-96.7970", "display_name": "Dallas, Texas, USA"},
         "Tulsa": {"lat": "36.1540", "lon": "-95.9928", "display_name": "Tulsa, Oklahoma, USA"},
-        "Boston": {"lat": "42.3601", "lon": "-71.0589", "display_name": "Boston, Massachusetts, USA"}
+        "Boston": {"lat": "42.3601", "lon": "-71.0589", "display_name": "Boston, Massachusetts, USA"},
+        "Chicago": {"lat": "41.8781", "lon": "-87.6298", "display_name": "Chicago, Illinois, USA"},
+        "New York": {"lat": "40.7128", "lon": "-74.0060", "display_name": "New York, New York, USA"},
+        "Los Angeles": {"lat": "34.0522", "lon": "-118.2437", "display_name": "Los Angeles, California, USA"},
+        "Miami": {"lat": "25.7617", "lon": "-80.1918", "display_name": "Miami, Florida, USA"},
+        "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"},
+        "Phoenix": {"lat": "33.4484", "lon": "-112.0740", "display_name": "Phoenix, Arizona, USA"},
+        "Philadelphia": {"lat": "39.9526", "lon": "-75.1652", "display_name": "Philadelphia, Pennsylvania, USA"},
+        "Houston": {"lat": "29.7604", "lon": "-95.3698", "display_name": "Houston, Texas, USA"},
+        "Denver": {"lat": "39.7392", "lon": "-104.9903", "display_name": "Denver, Colorado, USA"},
+        "Atlanta": {"lat": "33.7490", "lon": "-84.3880", "display_name": "Atlanta, Georgia, USA"}
     }
     
     if city_name in major_cities:
@@ -64,37 +75,75 @@ def get_wikipedia_summary_fixed(city_name):
             extract = data.get('extract', 'No summary available.')
             debug_log(f"✓ Wikipedia success")
             return extract
-    except:
-        debug_log("Wikipedia failed, using fallback")
+    except Exception as e:
+        debug_log(f"Wikipedia failed: {str(e)}")
     
-    # SIMPLE FALLBACK
+    # Fallback description
     return f"{city_name} is a vibrant city with a rich history and growing technology sector, offering numerous opportunities for software developers and tech professionals. The city has become a hub for innovation and digital transformation in recent years."
 
-def query_overpass_simple(amenity_type, lat, lon):
-    """Simple Overpass query with delay"""
-    bbox = f"{float(lat)-0.2},{float(lon)-0.2},{float(lat)+0.2},{float(lon)+0.2}"
+def query_overpass_fixed(amenity_type, lat, lon):
+    """Query Overpass API with proper delays"""
+    # Create bounding box around coordinates
+    bbox = f"{float(lat)-0.3},{float(lon)-0.3},{float(lat)+0.3},{float(lon)+0.3}"
     
-    if amenity_type == 'barbers':
-        query = f'[out:json];node["shop"="hairdresser"]({bbox});out;'
-    else:
-        query = f'[out:json];node["amenity"="{amenity_type}"]({bbox});out;'
+    queries = {
+        'libraries': f"""
+            [out:json][timeout:30];
+            (
+                node["amenity"="library"]({bbox});
+                way["amenity"="library"]({bbox});
+            );
+            out center;
+        """,
+        'bars': f"""
+            [out:json][timeout:30];
+            (
+                node["amenity"="bar"]({bbox});
+                way["amenity"="bar"]({bbox});
+            );
+            out center;
+        """,
+        'restaurants': f"""
+            [out:json][timeout:30];
+            (
+                node["amenity"="restaurant"]({bbox});
+                way["amenity"="restaurant"]({bbox});
+            );
+            out center;
+        """,
+        'barbers': f"""
+            [out:json][timeout:30];
+            (
+                node["shop"="hairdresser"]({bbox});
+                way["shop"="hairdresser"]({bbox});
+            );
+            out center;
+        """
+    }
     
-    debug_log(f"Querying {amenity_type}...")
+    debug_log(f"Querying Overpass for {amenity_type}...")
     
     try:
-        response = requests.post("http://overpass-api.de/api/interpreter", data=query)
+        response = requests.post(
+            "http://overpass-api.de/api/interpreter",
+            data=queries[amenity_type],
+            timeout=30
+        )
+        
         if response.status_code == 200:
             data = response.json()
             elements = data.get('elements', [])
             debug_log(f"✓ Found {len(elements)} {amenity_type}")
             return elements
+        else:
+            debug_log(f"❌ Overpass error: {response.status_code}")
     except Exception as e:
-        debug_log(f"Overpass error: {str(e)}")
+        debug_log(f"❌ Overpass exception: {str(e)}")
     
     return []
 
-def create_website_content(city_name, location_data, wikipedia_text):
-    """Create website content with basic replacements"""
+def create_website_content(city_name, location_data, wikipedia_text, amenities):
+    """Create website content with all replacements"""
     debug_log("Creating website content...")
     
     try:
@@ -104,34 +153,48 @@ def create_website_content(city_name, location_data, wikipedia_text):
         debug_log(f"❌ Cannot read index.html: {str(e)}")
         return None
     
-    # CRITICAL FIX: Replace all Oklahoma City references
+    # Replace all Oklahoma City references
     content = content.replace('Oklahoma City', city_name)
     content = content.replace('OKC', city_name)
     
     # Replace coordinates
-    content = content.replace('35.4676', location_data['lat'])
-    content = content.replace('-97.5164', location_data['lon'])
+    lat = location_data.get('lat', '0')
+    lon = location_data.get('lon', '0')
+    content = content.replace('35.4676', lat)
+    content = content.replace('-97.5164', lon)
     
     # Replace Wikipedia section
-    old_text = "Oklahoma City (OKC) is the capital and largest city of Oklahoma."
-    new_text = f"{city_name} {wikipedia_text}"
-    content = content.replace(old_text, new_text)
+    old_wiki_text = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
+    
+    # Add Wikipedia citation
+    wiki_with_citation = f"{wikipedia_text}<p><em>Source: Wikipedia</em></p>"
+    content = content.replace(old_wiki_text, wiki_with_citation)
+    
+    # Add OSM citation near coordinates
+    osm_citation = " | Data © OpenStreetMap contributors"
+    if "Oklahoma City" in content:  # If there are any remaining instances
+        content = content.replace("Oklahoma City", city_name)
     
     debug_log("✓ Template replacements completed")
     return content
 
 def deploy_to_github(repo_name, content):
-    """Deploy to GitHub with fixed authentication"""
+    """Deploy to GitHub with proper authentication"""
     debug_log(f"Deploying to GitHub: {repo_name}")
     
     try:
-        # CRITICAL FIX: Use GH_TOKEN from environment
+        # Use GH_TOKEN from environment
         token = os.getenv('GH_TOKEN')
         if not token:
             debug_log("❌ GH_TOKEN environment variable not found!")
+            debug_log("Available env vars:")
+            for key in os.environ:
+                if 'token' in key.lower() or 'github' in key.lower():
+                    debug_log(f"  {key}: {'*' * len(os.environ[key])}")
             return False
         
-        g = Github(auth=github.Auth.Token(token))
+        # Use proper authentication
+        g = Github(auth=Auth.Token(token))
         user = g.get_user()
         
         # Create repo
@@ -139,18 +202,28 @@ def deploy_to_github(repo_name, content):
             repo = user.get_repo(repo_name)
             debug_log(f"✓ Repository exists: {repo_name}")
         except:
-            repo = user.create_repo(repo_name, auto_init=False)
+            repo = user.create_repo(repo_name, auto_init=False, description=f"Software Guild for {repo_name}")
             debug_log(f"✓ Created repository: {repo_name}")
         
         # Create/update index.html
         try:
             contents = repo.get_contents("index.html")
             repo.update_file("index.html", f"Update {repo_name}", content, contents.sha)
+            debug_log("✓ Updated index.html")
         except:
             repo.create_file("index.html", f"Deploy {repo_name}", content)
+            debug_log("✓ Created index.html")
+        
+        # Try to enable GitHub Pages (may not work with GITHUB_TOKEN)
+        try:
+            repo.edit(has_pages=True)
+            debug_log("✓ Enabled GitHub Pages")
+        except Exception as e:
+            debug_log(f"Note: May need manual Pages setup: {str(e)}")
         
         debug_log("✅ DEPLOYMENT SUCCESSFUL!")
         debug_log(f"📁 Repository: https://github.com/TitanBusinessPros/{repo_name}")
+        debug_log(f"🌐 Pages URL: https://TitanBusinessPros.github.io/{repo_name}")
         return True
         
     except Exception as e:
@@ -174,11 +247,18 @@ def main():
     # 3. Get Wikipedia data
     wiki_text = get_wikipedia_summary_fixed(city_name)
     
-    # 4. Skip Overpass for now to speed up deployment
-    debug_log("Skipping Overpass queries for faster deployment")
+    # 4. Query amenities with proper delays
+    amenities = {}
+    amenity_types = ['libraries', 'bars', 'restaurants', 'barbers']
+    
+    for amenity in amenity_types:
+        amenities[amenity] = query_overpass_fixed(amenity, location['lat'], location['lon'])
+        if amenity != amenity_types[-1]:  # Don't wait after the last query
+            debug_log("Waiting 5 seconds before next Overpass query...")
+            time.sleep(5)
     
     # 5. Create website content
-    content = create_website_content(city_name, location, wiki_text)
+    content = create_website_content(city_name, location, wiki_text, amenities)
     if not content:
         return
     
@@ -186,6 +266,9 @@ def main():
     repo_name = f"The-{city_name}-Software-Guild"
     if deploy_to_github(repo_name, content):
         debug_log(f"🎉 {city_name} successfully deployed!")
+        debug_log("🔧 If GitHub Pages isn't auto-enabled, go to:")
+        debug_log(f"   https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
+        debug_log("   Select 'Deploy from a branch' and choose 'main' branch")
     else:
         debug_log("❌ Deployment failed")
 

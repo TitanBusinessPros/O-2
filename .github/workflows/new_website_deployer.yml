@@ -8,7 +8,7 @@ jobs:
   create-and-deploy-all-repos:
     runs-on: ubuntu-latest
     
-    # Required permission settings for creating new repositories
+    # Required permission settings for creating new repositories and GitHub Pages
     permissions:
       contents: write
       pages: write
@@ -26,12 +26,12 @@ jobs:
         python-version: '3.x'
 
     - name: 3. Install Required Python Libraries
-      # PyGithub for repo management, requests for all API calls (OSM, Overpass, Wikidata, NOAA)
+      # Installs PyGithub for API access and requests for HTTP calls
       run: pip install PyGithub requests
       
     - name: 4. Run City Deployer Script
+      # Executes the script from the repository root
       run: python new_website_deployer.py
       env:
-        # Your GitHub Personal Access Token (PAT)
-        # This token is used by PyGithub to create repos and commit files.
+        # Passes the GitHub Token as an environment variable to the script
         GH_TOKEN: ${{ secrets.new7 }}

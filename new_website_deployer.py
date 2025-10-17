@@ -131,7 +131,7 @@ def deploy_to_github(repo_name, content):
             debug_log("❌ GH_TOKEN environment variable not found!")
             return False
         
-        g = Github(token)
+        g = Github(auth=github.Auth.Token(token))
         user = g.get_user()
         
         # Create repo

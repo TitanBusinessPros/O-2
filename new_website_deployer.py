@@ -5,7 +5,7 @@ import json
 import time
 import datetime
 import base64
-from github import Github
+from github import Github, Auth
 from textwrap import dedent
 
 # --- CONFIGURATION ---
@@ -35,8 +35,26 @@ def get_city_list(file_name):
 def get_coordinates_and_bbox(city_name):
     """
     Uses OSM Nominatim to geocode the city and return its coordinates and bounding box.
+    Now properly handles city names with states/countries.
     """
-    search_query = f"{city_name}, USA"
+    # Preserve the full city name with state for accurate geocoding
+    if '-' in city_name and any(word in city_name for word in ['Oklahoma', 'Texas', 'California', 'Florida', 'New York']):
+        # Handle "City-State" format like "Yukon-Oklahoma"
+        city_parts = city_name.split('-')
+        if len(city_parts) == 2:
+            city = city_parts[0].strip()
+            state = city_parts[1].strip()
+            search_query = f"{city}, {state}, USA"
+        else:
+            search_query = f"{city_name}, USA"
+    elif ',' in city_name:
+        # Handle "City, State" format
+        search_query = f"{city_name}, USA"
+    else:
+        # Just city name - default to Oklahoma for your use case
+        search_query = f"{city_name}, Oklahoma, USA"
+    
+    print(f"   -> Geocoding search: {search_query}")
     url = f"https://nominatim.openstreetmap.org/search?q={search_query}&format=json&limit=1"
     
     headers = {'User-Agent': 'Titan-Software-Guild-Deployment-Script/1.0'}
@@ -49,39 +67,52 @@ def get_coordinates_and_bbox(city_name):
         if data:
             lat = data[0]['lat']
             lon = data[0]['lon']
+            display_name = data[0].get('display_name', 'Unknown location')
             
             bbox_list = [float(b) for b in data[0]['boundingbox']]
             s_lat, n_lat, w_lon, e_lon = bbox_list[0], bbox_list[1], bbox_list[2], bbox_list[3]
             bbox = f"{s_lat},{w_lon},{n_lat},{e_lon}" 
             
-            print(f"   -> Found Lat: {lat}, Lon: {lon}, BBox: {bbox}")
+            print(f"   -> Found: {display_name}")
+            print(f"   -> Coordinates: Lat: {lat}, Lon: {lon}, BBox: {bbox}")
             return lat, lon, bbox
         else:
-            print(f"   -> WARNING: Could not geocode city '{city_name}'. Skipping.")
+            print(f"   -> WARNING: Could not geocode '{search_query}'. Skipping.")
             return None, None, None
             
     except requests.RequestException as e:
-        print(f"   -> ERROR geocoding '{city_name}': {e}")
+        print(f"   -> ERROR geocoding '{search_query}': {e}")
         return None, None, None
 
 def get_overpass_data(bbox, amenity_tag, limit=3):
     """Uses Overpass API to get a list of venues based on amenity tag and BBox."""
-    time.sleep(OVERPASS_CALL_DELAY_SECONDS)  # 5 second delay between calls
+    time.sleep(OVERPASS_CALL_DELAY_SECONDS)
     
     overpass_url = "https://overpass-api.de/api/interpreter"
     
-    overpass_query = f"""
-    [out:json][timeout:25];
-    (
-      node["{amenity_tag}"]({bbox});
-      way["{amenity_tag}"]({bbox});
-      relation["{amenity_tag}"]({bbox});
-    );
-    out center {limit};
-    """
+    # Simplified query to avoid timeouts
+    if '=' in amenity_tag:
+        key, value = amenity_tag.split('=')
+        overpass_query = f"""
+        [out:json][timeout:45];
+        (
+          node[{key}={value}]({bbox});
+          way[{key}={value}]({bbox});
+        );
+        out center {limit};
+        """
+    else:
+        overpass_query = f"""
+        [out:json][timeout:45];
+        (
+          node[{amenity_tag}]({bbox});
+          way[{amenity_tag}]({bbox});
+        );
+        out center {limit};
+        """
     
     try:
-        response = requests.post(overpass_url, data={'data': overpass_query}, timeout=30)
+        response = requests.post(overpass_url, data={'data': overpass_query}, timeout=60)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -96,25 +127,31 @@ def get_wikipedia_summary(city_name):
     
     headers = {'User-Agent': 'Titan-Software-Guild-Deployment-Script/1.0'}
     
-    # Wikipedia API endpoint
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{city_name.replace(' ', '_')}"
+    # Clean city name for Wikipedia - use just the city part
+    clean_city_name = city_name.split('-')[0].split(',')[0].strip()
     
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+    # Try different Wikipedia query formats
+    wikipedia_queries = [
+        clean_city_name + ",_Oklahoma",
+        clean_city_name
+    ]
+    
+    for query in wikipedia_queries:
+        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
         
-        if 'extract' in data:
-            summary = data['extract']
-            # Ensure proper citation
-            summary += f" (Source: Wikipedia)"
-            return summary
-        else:
-            return f"{city_name} is a vibrant city with a rich history and growing technology sector. The Titan Software Guild aims to be at the forefront of software development education in this community. (Source: Wikipedia)"
-            
-    except requests.RequestException as e:
-        print(f"   -> ERROR fetching Wikipedia summary: {e}")
-        return f"{city_name} is the current focal point of the software development revolution. The Titan Software Guild aims to be the center of this movement in the area. (Source: Wikipedia)"
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                if 'extract' in data:
+                    summary = data['extract']
+                    summary += f" (Source: Wikipedia)"
+                    return summary
+        except requests.RequestException:
+            continue
+    
+    # Fallback description for smaller towns
+    return f"{clean_city_name}, Oklahoma is a community where technology and innovation are creating new opportunities. The Titan Software Guild brings cutting-edge software education to this area, empowering residents to build the digital future. (Source: Wikipedia)"
 
 def get_venue_html(overpass_data, venue_type):
     """Formats Overpass venue data into an HTML list."""
@@ -123,7 +160,7 @@ def get_venue_html(overpass_data, venue_type):
     
     html_list = ["<ul>"]
     
-    for element in overpass_data['elements'][:3]:  # Limit to 3 venues
+    for element in overpass_data['elements'][:3]:
         name = element['tags'].get('name', f'Unnamed {venue_type}')
         
         # Build address information
@@ -132,6 +169,8 @@ def get_venue_html(overpass_data, venue_type):
             address_parts.append(element['tags']['addr:street'])
         if 'addr:city' in element['tags']:
             address_parts.append(element['tags']['addr:city'])
+        elif 'addr:place' in element['tags']:
+            address_parts.append(element['tags']['addr:place'])
         
         address = ', '.join(address_parts) if address_parts else 'Address not available'
         
@@ -182,7 +221,7 @@ def replace_in_content(content, placeholder, replacement):
 def process_city_deployment(g, user, token, city_name):
     """Orchestrates the data fetching, content replacement, and repository deployment for a single city."""
     
-    repo_name = f"{REPO_PREFIX}{city_name.replace(' ', '-')}{REPO_SUFFIX}"
+    repo_name = f"{REPO_PREFIX}{city_name.replace(' ', '-').replace(',', '')}{REPO_SUFFIX}"
     print(f"\n=======================================================")
     print(f"STARTING DEPLOYMENT FOR: {city_name} (Repo: {repo_name})")
     print(f"=======================================================")
@@ -229,9 +268,12 @@ def process_city_deployment(g, user, token, city_name):
     # 5. TEMPLATE REPLACEMENT LOGIC
     print("-> Applying template replacements...")
     
+    # Clean city name for display (use just the city part)
+    display_city_name = city_name.split('-')[0].split(',')[0].strip()
+    
     # a. Replace all occurrences of Oklahoma City
-    html_content = replace_in_content(html_content, "Oklahoma City", city_name)
-    html_content = replace_in_content(html_content, "OKC", city_name)
+    html_content = replace_in_content(html_content, "Oklahoma City", display_city_name)
+    html_content = replace_in_content(html_content, "OKC", display_city_name)
     
     # b. Replace latitude and longitude
     html_content = replace_in_content(html_content, "35.4676", str(lat))
@@ -265,7 +307,7 @@ def process_city_deployment(g, user, token, city_name):
         if sha:
             target_repo.update_file(
                 path=TEMPLATE_FILE_NAME,
-                message=f"Auto-update: Redeploying website for {city_name}",
+                message=f"Auto-update: Redeploying website for {display_city_name}",
                 content=html_content,
                 sha=sha,
                 branch="main"
@@ -274,7 +316,7 @@ def process_city_deployment(g, user, token, city_name):
         else:
             target_repo.create_file(
                 path=TEMPLATE_FILE_NAME,
-                message=f"Auto-deploy: Initial deployment for {city_name}",
+                message=f"Auto-deploy: Initial deployment for {display_city_name}",
                 content=html_content,
                 branch="main"
             )
@@ -287,7 +329,7 @@ def process_city_deployment(g, user, token, city_name):
             try:
                 new_repo = user.create_repo(
                     name=repo_name,
-                    description=f"Local Deployment Hub for The Titan Software Guild in {city_name}",
+                    description=f"Local Deployment Hub for The Titan Software Guild in {display_city_name}",
                     private=False,
                     has_issues=True,
                     has_projects=False,
@@ -298,24 +340,22 @@ def process_city_deployment(g, user, token, city_name):
                 # Create the initial index.html file in the new repo
                 new_repo.create_file(
                     path=TEMPLATE_FILE_NAME,
-                    message=f"Auto-deploy: Initial deployment for {city_name}",
+                    message=f"Auto-deploy: Initial deployment for {display_city_name}",
                     content=html_content,
                     branch="main"
                 )
-                print(f"   -> Successfully created new repo and deployed website for {city_name}")
+                print(f"   -> Successfully created new repo and deployed website for {display_city_name}")
                 
-                # Set up GitHub Pages for the newly created repo
-                print(f"   -> Setting up GitHub Pages for {repo_name}...")
-                new_repo.enable_pages(
-                    source={"branch": "main", "path": "/"}
-                )
-                print(f"   -> GitHub Pages successfully enabled.")
+                # Note: GitHub Pages must be enabled manually
+                print(f"   -> IMPORTANT: GitHub Pages must be enabled manually in the repository settings.")
+                print(f"   -> Go to: https://github.com/{user.login}/{repo_name}/settings/pages")
+                print(f"   -> Select 'Deploy from a branch' and choose 'main' branch")
                 
             except Exception as creation_e:
-                print(f"FATAL ERROR during new repository creation/setup for {city_name}: {creation_e}")
+                print(f"FATAL ERROR during new repository creation/setup for {display_city_name}: {creation_e}")
                 return
         else:
-            print(f"FATAL ERROR during repository operation for {city_name}: {e}")
+            print(f"FATAL ERROR during repository operation for {display_city_name}: {e}")
             return
 
     print(f"COMPLETED DEPLOYMENT FOR: {city_name}")
@@ -329,7 +369,8 @@ def main():
         sys.exit(1)
 
     try:
-        g = Github(token)
+        # FIXED: Use new authentication method
+        g = Github(auth=Auth.Token(token))
         user = g.get_user()
         print(f"Authenticated as: {user.login}")
     except Exception as e:

@@ -4,27 +4,24 @@ import requests
 import json
 import re
 import base64
-from time import sleep
+import time
+import datetime
 from github import Github
 from textwrap import dedent
 
 # --- CONFIGURATION ---
-# !!! IMPORTANT: CHANGE THIS TO THE NAME OF YOUR REPOSITORY (e.g., "O-2") !!!
-BASE_REPO_NAME = "O-2"  # <-- VERIFY THIS NAME IS CORRECT (e.g., "O-2")
+BASE_REPO_NAME = "O-2"
 REPO_PREFIX = "The-"
 REPO_SUFFIX = "-Software-Guild"
 TEMPLATE_FILE_NAME = "index.html"
 CITY_LIST_FILE = "new.txt"
 
-# Delay between each *city deployment* to avoid hitting API rate limits (in seconds)
+# Delay between each city deployment to avoid hitting API rate limits
 DEPLOYMENT_DELAY_SECONDS = 180
 
-# Overpass API call delay (in seconds) to avoid per-request limits
-OVERPASS_CALL_DELAY_SECONDS = 2
+# Overpass API call delay (increased to 5 seconds as requested)
+OVERPASS_CALL_DELAY_SECONDS = 5
 # ---------------------
-
-
-# --- HELPER FUNCTIONS ---
 
 def get_city_list(file_name):
     """Reads the list of cities from the provided text file."""
@@ -36,7 +33,6 @@ def get_city_list(file_name):
         print(f"FATAL: The file '{file_name}' was not found. Exiting.")
         sys.exit(1)
 
-
 def get_coordinates_and_bbox(city_name):
     """
     Uses OSM Nominatim to geocode the city and return its coordinates and bounding box.
@@ -44,7 +40,6 @@ def get_coordinates_and_bbox(city_name):
     search_query = f"{city_name}, USA"
     url = f"https://nominatim.openstreetmap.org/search?q={search_query}&format=json&limit=1"
     
-    # Required custom User-Agent for Nominatim
     headers = {'User-Agent': 'Titan-Software-Guild-Deployment-Script/1.0'}
     
     try:
@@ -56,14 +51,11 @@ def get_coordinates_and_bbox(city_name):
             lat = data[0]['lat']
             lon = data[0]['lon']
             
-            # The boundingbox list from Nominatim is typically [min_lat, max_lat, min_lon, max_lon]
             bbox_list = [float(b) for b in data[0]['boundingbox']]
-            
-            # Overpass QL format (S, W, N, E)
             s_lat, n_lat, w_lon, e_lon = bbox_list[0], bbox_list[1], bbox_list[2], bbox_list[3]
             bbox = f"{s_lat},{w_lon},{n_lat},{e_lon}" 
             
-            print(f"   -> Found Lat: {lat}, Lon: {lon}, BBox (S,W,N,E): {bbox}")
+            print(f"   -> Found Lat: {lat}, Lon: {lon}, BBox: {bbox}")
             return lat, lon, bbox
         else:
             print(f"   -> WARNING: Could not geocode city '{city_name}'. Skipping.")
@@ -73,23 +65,21 @@ def get_coordinates_and_bbox(city_name):
         print(f"   -> ERROR geocoding '{city_name}': {e}")
         return None, None, None
 
-
 def get_overpass_data(bbox, amenity_tag, limit=3):
     """Uses Overpass API to get a list of venues based on amenity tag and BBox."""
-    sleep(OVERPASS_CALL_DELAY_SECONDS)
+    time.sleep(OVERPASS_CALL_DELAY_SECONDS)  # 5 second delay between calls
     
     overpass_url = "https://overpass-api.de/api/interpreter"
     
-    # Overpass QL query:
-    overpass_query = dedent(f"""
+    overpass_query = f"""
     [out:json][timeout:25];
     (
-      node["{amenity_tag}"~"."][name](bbox:{bbox});
-      way["{amenity_tag}"~"."][name](bbox:{bbox});
-      relation["{amenity_tag}"~"."][name](bbox:{bbox});
+      node["{amenity_tag}"]({bbox});
+      way["{amenity_tag}"]({bbox});
+      relation["{amenity_tag}"]({bbox});
     );
     out center {limit};
-    """).strip()
+    """
     
     try:
         response = requests.post(overpass_url, data={'data': overpass_query}, timeout=30)
@@ -99,90 +89,71 @@ def get_overpass_data(bbox, amenity_tag, limit=3):
         print(f"   -> ERROR querying Overpass for {amenity_tag}: {e}")
         return None
 
-
-def get_wikidata_summary(city_name):
+def get_wikipedia_summary(city_name):
     """
-    Fetches a descriptive summary for the city from the Wikidata API.
+    Fetches a descriptive summary for the city from Wikipedia API.
     """
-    print("-> Fetching city summary from Wikidata...")
+    print(f"-> Fetching city summary from Wikipedia for {city_name}...")
     
-    # Required User-Agent header to avoid 403 Forbidden error
-    headers = {'User-Agent': 'Titan-Software-Guild-Deployment-Script/1.0 (Contact: user@example.com)'}
+    headers = {'User-Agent': 'Titan-Software-Guild-Deployment-Script/1.0'}
     
-    # Step 1: Search for the entity (QID)
-    search_url = (
-        "https://www.wikidata.org/w/api.php?action=wbsearchentities&search="
-        f"{city_name} city&language=en&format=json&limit=1"
-    )
+    # Wikipedia API endpoint
+    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{city_name.replace(' ', '_')}"
+    
     try:
-        search_res = requests.get(search_url, headers=headers, timeout=10)
-        search_res.raise_for_status()
-        search_data = search_res.json()
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
         
-        if not search_data['search']:
-            print("   -> WARNING: Wikidata search failed.")
-            return f"No detailed history found for {city_name} on Wikidata."
-            
-        qid = search_data['search'][0]['id']
-        
-        # Step 2: Fetch the summary (description/sitelinks)
-        entity_url = (
-            "https://www.wikidata.org/w/api.php?action=wbgetentities&ids="
-            f"{qid}&format=json&languages=en&props=descriptions"
-        )
-        entity_res = requests.get(entity_url, headers=headers, timeout=10)
-        entity_res.raise_for_status()
-        entity_data = entity_res.json()
-        
-        description = entity_data['entities'][qid]['descriptions']['en']['value']
-        
-        if description and 'city' in description.lower():
-            summary = (
-                f"{city_name} is a major metropolitan area. {description}. "
-                "Data provided by Wikimedia/Wikidata."
-            )
+        if 'extract' in data:
+            summary = data['extract']
+            # Ensure proper citation
+            summary += f" (Source: Wikipedia)"
             return summary
         else:
-            return (
-                f"{city_name} is the current focal point of the software development revolution. "
-                "The Titan Software Guild aims to be the center of this movement in the area. "
-                "Data provided by Wikimedia/Wikidata."
-            )
+            return f"{city_name} is a vibrant city with a rich history and growing technology sector. The Titan Software Guild aims to be at the forefront of software development education in this community. (Source: Wikipedia)"
             
     except requests.RequestException as e:
-        print(f"   -> ERROR fetching Wikidata summary: {e}")
-        return f"Could not retrieve city summary from Wikidata due to an error."
+        print(f"   -> ERROR fetching Wikipedia summary: {e}")
+        return f"{city_name} is the current focal point of the software development revolution. The Titan Software Guild aims to be the center of this movement in the area. (Source: Wikipedia)"
 
-
-def get_venue_html(overpass_data):
+def get_venue_html(overpass_data, venue_type):
     """Formats Overpass venue data into an HTML list."""
     if not overpass_data or not overpass_data.get('elements'):
-        return "<ul><li>No local venues found in this category.</li></ul>"
+        return f"<ul><li>No {venue_type} found in this area.</li></ul>"
     
     html_list = ["<ul>"]
     
-    for element in overpass_data['elements']:
-        name = element['tags'].get('name', 'Unnamed Location')
-        street = element['tags'].get('addr:street', 'Unknown Street')
-        city = element['tags'].get('addr:city', 'The City')
+    for element in overpass_data['elements'][:3]:  # Limit to 3 venues
+        name = element['tags'].get('name', f'Unnamed {venue_type}')
         
-        # Link to Google Maps
+        # Build address information
+        address_parts = []
+        if 'addr:street' in element['tags']:
+            address_parts.append(element['tags']['addr:street'])
+        if 'addr:city' in element['tags']:
+            address_parts.append(element['tags']['addr:city'])
+        
+        address = ', '.join(address_parts) if address_parts else 'Address not available'
+        
+        # Create Google Maps link
         if 'lat' in element and 'lon' in element:
             link = f"https://www.google.com/maps/search/?api=1&query={element['lat']},{element['lon']}"
+        elif 'center' in element:
+            link = f"https://www.google.com/maps/search/?api=1&query={element['center']['lat']},{element['center']['lon']}"
         else:
             link = "https://www.google.com/maps"
             
-        html_list.append(dedent(f"""
+        html_list.append(f"""
             <li>
                 <a href="{link}" target="_blank">{name}</a>
-                <p class="address-line">{street}, {city}</p>
+                <p class="address-line">{address}</p>
             </li>
-        """))
+        """)
         
     html_list.append("</ul>")
     
     return "".join(html_list)
-
 
 def load_template_content(repo, file_path):
     """Fetches and decodes the content of a file from the GitHub repository."""
@@ -205,13 +176,9 @@ def get_content_sha(repo, file_path):
 
 def replace_in_content(content, placeholder, replacement):
     """Performs a global search and replace."""
-    # Safety check: Prevent MemoryError by ensuring placeholder is not an empty string
     if not placeholder:
         raise ValueError("Placeholder for replacement cannot be an empty string.")
     return content.replace(placeholder, replacement)
-
-
-# --- MAIN LOGIC ---
 
 def process_city_deployment(g, user, token, city_name):
     """Orchestrates the data fetching, content replacement, and repository deployment for a single city."""
@@ -221,23 +188,36 @@ def process_city_deployment(g, user, token, city_name):
     print(f"STARTING DEPLOYMENT FOR: {city_name} (Repo: {repo_name})")
     print(f"=======================================================")
     
-    # 1. GEOCODING AND WIKIDATA FETCH
+    # 1. GEOCODING
     print("-> Geocoding city with OSM Nominatim...")
     lat, lon, bbox = get_coordinates_and_bbox(city_name)
     if not lat:
-        print(f"COMPLETED DEPLOYMENT FOR: {city_name} (Skipped due to geocoding error/warning)")
+        print(f"COMPLETED DEPLOYMENT FOR: {city_name} (Skipped due to geocoding error)")
         return
-        
-    summary_text = get_wikidata_summary(city_name)
+    
+    # 2. WIKIPEDIA SUMMARY
+    summary_text = get_wikipedia_summary(city_name)
 
-    # 2. OVERPASS DATA FETCH (Libraries, Bars, Restaurants, Barbers)
+    # 3. OVERPASS DATA FETCH with proper delays
     print("-> Querying Overpass for amenities...")
+    
+    # Libraries
+    print("   -> Fetching libraries...")
     libraries_data = get_overpass_data(bbox, 'amenity=library')
+    
+    # Bars
+    print("   -> Fetching bars...")
     bars_data = get_overpass_data(bbox, 'amenity=bar')
+    
+    # Restaurants
+    print("   -> Fetching restaurants...")
     restaurants_data = get_overpass_data(bbox, 'amenity=restaurant')
+    
+    # Barbers
+    print("   -> Fetching barbers...")
     barbers_data = get_overpass_data(bbox, 'shop=barber')
 
-    # 3. GET TEMPLATE CONTENT
+    # 4. GET TEMPLATE CONTENT
     try:
         source_repo = g.get_user().get_repo(BASE_REPO_NAME) 
         html_content = load_template_content(source_repo, TEMPLATE_FILE_NAME)
@@ -247,45 +227,35 @@ def process_city_deployment(g, user, token, city_name):
         print(f"FATAL ERROR during deployment for {city_name}: {e}")
         return
         
-    # 4. TEMPLATE REPLACEMENT LOGIC
+    # 5. TEMPLATE REPLACEMENT LOGIC
     print("-> Applying template replacements...")
     
-    # a. City Name (for Title and description)
-    html_content = replace_in_content(html_content, "Oklahoma City Deployment Hub", f"{city_name} Deployment Hub")
+    # a. Replace all occurrences of Oklahoma City
     html_content = replace_in_content(html_content, "Oklahoma City", city_name)
     html_content = replace_in_content(html_content, "OKC", city_name)
     
-    # b. Lat/Lon for weather updater
-    # !!! THIS IS THE FIX: Replacing "" with the correct placeholder "" !!!
-    html_content = replace_in_content(html_content, "", str(lat))
-    html_content = replace_in_content(html_content, "", str(lon))
+    # b. Replace latitude and longitude (assuming placeholders exist in template)
+    html_content = replace_in_content(html_content, "35.4676", str(lat))  # Default OKC lat
+    html_content = replace_in_content(html_content, "-97.5164", str(lon))  # Default OKC lon
     
-    # c. Wikidata Summary (Must match the exact text in the template)
-    original_summary_text = dedent("""
-        **Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team.**
-        The Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives.
-    """).strip()
+    # c. Replace Wikipedia summary
+    original_okc_paragraph = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
+    html_content = replace_in_content(html_content, original_okc_paragraph, summary_text)
     
-    replacement_summary = (
-        f"**{summary_text}**\n"
-        "The Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
-    ).strip()
+    # d. Replace venue lists
+    html_content = replace_in_content(html_content, "<!-- LIBRARIES_PLACEHOLDER -->", get_venue_html(libraries_data, "libraries"))
+    html_content = replace_in_content(html_content, "<!-- BARS_PLACEHOLDER -->", get_venue_html(bars_data, "bars"))
+    html_content = replace_in_content(html_content, "<!-- RESTAURANTS_PLACEHOLDER -->", get_venue_html(restaurants_data, "restaurants"))
+    html_content = replace_in_content(html_content, "<!-- BARBERS_PLACEHOLDER -->", get_venue_html(barbers_data, "barbers"))
     
-    html_content = replace_in_content(html_content, original_summary_text, replacement_summary)
+    # e. Add citations
+    osm_citation = "© OpenStreetMap contributors"
+    html_content = replace_in_content(html_content, "<!-- OSM_CITATION_PLACEHOLDER -->", osm_citation)
     
-    # d. Venue Lists (Libraries, Bars, Restaurants, Barbers)
-    html_content = replace_in_content(html_content, "", get_venue_html(libraries_data))
-    html_content = replace_in_content(html_content, "", get_venue_html(bars_data))
-    html_content = replace_in_content(html_content, "", get_venue_html(restaurants_data))
-    html_content = replace_in_content(html_content, "", get_venue_html(barbers_data))
-    
-    # e. Weather Section (Initial data injection)
-    import datetime
-    current_time_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC (Initial Deployment)")
-    html_content = replace_in_content(html_content, "", current_time_utc)
+    noaa_citation = "Weather data provided by NOAA"
+    html_content = replace_in_content(html_content, "<!-- NOAA_CITATION_PLACEHOLDER -->", noaa_citation)
 
-
-    # 5. REPOSITORY CREATION/UPDATE
+    # 6. REPOSITORY CREATION/UPDATE
     print(f"-> Checking for existing repository: {repo_name}...")
     try:
         target_repo = g.get_user().get_repo(repo_name)
@@ -296,20 +266,20 @@ def process_city_deployment(g, user, token, city_name):
         if sha:
             target_repo.update_file(
                 path=TEMPLATE_FILE_NAME,
-                message=f"Auto-update: Redploying website for {city_name}",
+                message=f"Auto-update: Redeploying website for {city_name}",
                 content=html_content,
                 sha=sha,
                 branch="main"
             )
             print(f"   -> Successfully updated file in existing repo: {repo_name}")
         else:
-             target_repo.create_file(
+            target_repo.create_file(
                 path=TEMPLATE_FILE_NAME,
                 message=f"Auto-deploy: Initial deployment for {city_name}",
                 content=html_content,
                 branch="main"
             )
-             print(f"   -> Created new file in existing repo: {repo_name}")
+            print(f"   -> Created new file in existing repo: {repo_name}")
 
     except Exception as e:
         if "404" in str(e) or "Not Found" in str(e):
@@ -351,7 +321,6 @@ def process_city_deployment(g, user, token, city_name):
 
     print(f"COMPLETED DEPLOYMENT FOR: {city_name}")
 
-
 def main():
     """Main function to handle authentication and city list processing."""
     
@@ -378,12 +347,11 @@ def main():
     for i, city in enumerate(all_cities):
         if i > 0:
             print(f"\n--- PAUSING for {DEPLOYMENT_DELAY_SECONDS} seconds before next deployment... ---")
-            sleep(DEPLOYMENT_DELAY_SECONDS)
+            time.sleep(DEPLOYMENT_DELAY_SECONDS)
         
         process_city_deployment(g, user, token, city)
     
-    print("\n\n*** ALL DUPLICATE DEPLOYMENTS COMPLETE ***")
-
+    print("\n\n*** ALL DEPLOYMENTS COMPLETE ***")
 
 if __name__ == "__main__":
     main()

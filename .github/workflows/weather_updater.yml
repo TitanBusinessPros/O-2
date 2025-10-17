@@ -1,0 +1,35 @@
+name: Daily City Weather Updater
+
+on:
+  # Runs once per day at 04:00 UTC (4:00 AM UTC).
+  # You can adjust this 'cron' schedule as needed.
+  schedule:
+    - cron: '0 4 * * *' 
+
+jobs:
+  update-all-repos:
+    runs-on: ubuntu-latest
+    
+    # Required permission settings for reading and writing to existing repositories
+    permissions:
+      contents: write
+
+    steps:
+    - name: 1. Checkout source repository (to access the Python script)
+      uses: actions/checkout@v4
+      
+    - name: 2. Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: 3. Install Required Python Libraries
+      # PyGithub for repo discovery and file commit, requests for NOAA API calls
+      run: pip install PyGithub requests
+      
+    - name: 4. Run Weather Updater Script
+      run: python weather_updater.py
+      env:
+        # Your GitHub Personal Access Token (PAT)
+        # This token is used to list all repos and commit the weather update.
+        GH_TOKEN: ${{ secrets.new7 }}

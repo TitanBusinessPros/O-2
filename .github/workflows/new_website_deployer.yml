@@ -1,14 +1,12 @@
 name: New Manual City Website Deployer
 
 on:
-  # Allows the workflow to be triggered manually from the GitHub UI
   workflow_dispatch:
 
 jobs:
   create-and-deploy-all-repos:
     runs-on: ubuntu-latest
     
-    # Required permission settings for creating new repositories and GitHub Pages
     permissions:
       contents: write
       pages: write
@@ -26,12 +24,9 @@ jobs:
         python-version: '3.x'
 
     - name: 3. Install Required Python Libraries
-      # Installs PyGithub for API access and requests for HTTP calls
       run: pip install PyGithub requests
       
     - name: 4. Run City Deployer Script
-      # Executes the script from the repository root
       run: python new_website_deployer.py
       env:
-        # Passes the GitHub Token as an environment variable to the script
         GH_TOKEN: ${{ secrets.new7 }}

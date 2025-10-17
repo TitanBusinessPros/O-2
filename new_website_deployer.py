@@ -103,7 +103,6 @@ def get_overpass_data(bbox, amenity_tag, limit=3):
 def get_wikidata_summary(city_name):
     """
     Fetches a descriptive summary for the city from the Wikidata API.
-    FIX: Added User-Agent header to resolve the 403 Forbidden error.
     """
     print("-> Fetching city summary from Wikidata...")
     
@@ -257,7 +256,7 @@ def process_city_deployment(g, user, token, city_name):
     html_content = replace_in_content(html_content, "OKC", city_name)
     
     # b. Lat/Lon for weather updater
-    # !!! FIX: Correct placeholders for Latitude and Longitude to avoid ValueError !!!
+    # FIX: Correct placeholders for Latitude and Longitude (lines 257-258)
     html_content = replace_in_content(html_content, "", str(lat))
     html_content = replace_in_content(html_content, "", str(lon))
     

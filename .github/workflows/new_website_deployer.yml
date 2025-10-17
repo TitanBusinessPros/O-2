@@ -1,6 +1,4 @@
-# .github/workflows/new_website_deployer.yml
-
-name: New Manual City Website Deployer Duplicate
+name: New Manual City Website Deployer
 
 on:
   # Allows the workflow to be triggered manually from the GitHub UI
@@ -10,7 +8,7 @@ jobs:
   create-and-deploy-all-repos:
     runs-on: ubuntu-latest
     
-    # Required permission settings for creating new repositories and pages
+    # Required permission settings for creating new repositories
     permissions:
       contents: write
       pages: write
@@ -28,15 +26,12 @@ jobs:
         python-version: '3.x'
 
     - name: 3. Install Required Python Libraries
-      # Installs PyGithub, requests, and the new 'wikipedia-api'
-      run: pip install PyGithub requests wikipedia-api
+      # PyGithub for repo management, requests for all API calls (OSM, Overpass, Wikidata, NOAA)
+      run: pip install PyGithub requests
       
-    - name: 4. Run Script to Create & Deploy ALL Repos
+    - name: 4. Run City Deployer Script
+      run: python new_website_deployer.py
       env:
-        # Passes the required GitHub Personal Access Token
+        # Your GitHub Personal Access Token (PAT)
+        # This token is used by PyGithub to create repos and commit files.
         GH_TOKEN: ${{ secrets.new7 }}
-        # Passes the Google API Key (Must be set in GitHub secrets)
-        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-        # Set the required delay between repo creations (in seconds)
-        DEPLOY_DELAY: 180 
-      run: python new_website_updater.py

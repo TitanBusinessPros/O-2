@@ -1,46 +1,49 @@
-name: City Website Deployment
+name: Deploy City Website
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  deploy-city-websites:
+  deploy:
     runs-on: ubuntu-latest
     
     permissions:
       contents: write
       pages: write
       id-token: write
-
+    
     steps:
-    - name: Checkout source repository
+    - name: Checkout code
       uses: actions/checkout@v4
-
+      
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-
-    - name: Install Python Libraries
-      run: pip install PyGithub requests
-
-    - name: Verify required files exist
+        
+    - name: Install dependencies
       run: |
-        echo "Checking for required files:"
-        ls -la
-        if [ ! -f new_website_deployer.py ]; then
-          echo "ERROR: new_website_deployer.py not found!"
-          exit 1
-        fi
-        if [ ! -f new.txt ]; then
-          echo "ERROR: new.txt not found!"
-          exit 1
-        fi
-        echo "All required files found"
-        echo "Cities to deploy:"
-        cat new.txt
-
-    - name: Run Deployment Script
-      run: python new_website_deployer.py
+        python -m pip install --upgrade pip
+        pip install PyGithub requests
+        
+    - name: Create city file
+      run: |
+        echo "Nashville" > new.txt
+        
+    - name: Deploy website
       env:
-         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python new_website_deployer.py
+        
+    - name: Setup Pages
+      if: always()
+      uses: actions/configure-pages@v3
+      
+    - name: Upload artifact
+      if: always()
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: '.'

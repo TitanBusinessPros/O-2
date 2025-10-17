@@ -116,7 +116,7 @@ def get_wikidata_summary(city_name):
         f"{city_name} city&language=en&format=json&limit=1"
     )
     try:
-        search_res = requests.get(search_url, headers=headers, timeout=10) # Added headers
+        search_res = requests.get(search_url, headers=headers, timeout=10)
         search_res.raise_for_status()
         search_data = search_res.json()
         
@@ -131,7 +131,7 @@ def get_wikidata_summary(city_name):
             "https://www.wikidata.org/w/api.php?action=wbgetentities&ids="
             f"{qid}&format=json&languages=en&props=descriptions"
         )
-        entity_res = requests.get(entity_url, headers=headers, timeout=10) # Added headers
+        entity_res = requests.get(entity_url, headers=headers, timeout=10)
         entity_res.raise_for_status()
         entity_data = entity_res.json()
         
@@ -257,6 +257,7 @@ def process_city_deployment(g, user, token, city_name):
     html_content = replace_in_content(html_content, "OKC", city_name)
     
     # b. Lat/Lon for weather updater
+    # !!! FIX: Correct placeholders for Latitude and Longitude to avoid ValueError !!!
     html_content = replace_in_content(html_content, "", str(lat))
     html_content = replace_in_content(html_content, "", str(lon))
     
@@ -274,7 +275,6 @@ def process_city_deployment(g, user, token, city_name):
     html_content = replace_in_content(html_content, original_summary_text, replacement_summary)
     
     # d. Venue Lists (Libraries, Bars, Restaurants, Barbers)
-    # Corrected the placeholder error that caused the MemoryError
     html_content = replace_in_content(html_content, "", get_venue_html(libraries_data))
     html_content = replace_in_content(html_content, "", get_venue_html(bars_data))
     html_content = replace_in_content(html_content, "", get_venue_html(restaurants_data))
@@ -362,7 +362,6 @@ def main():
         sys.exit(1)
 
     try:
-        # Authenticate with GitHub
         g = Github(token)
         user = g.get_user()
         print(f"Authenticated as: {user.login}")

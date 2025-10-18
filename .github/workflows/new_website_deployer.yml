@@ -1,12 +1,8 @@
 name: Dynamic Hub Deployment
 
 on:
-  push:
-    paths:
-      # Trigger this workflow whenever the configuration file is modified
-      - 'new.txt'
-    branches:
-      - main  # Only run on the main branch (or your primary branch)
+  # This configuration ensures the workflow can ONLY be run manually from the GitHub Actions tab.
+  workflow_dispatch:
 
 jobs:
   update_hub:
@@ -35,5 +31,5 @@ jobs:
           # Check if Final1.html was modified by the script
           file_pattern: 'Final1.html'
           # Include the secret name 'new7' in the commit message
-          commit_message: '⚙️ AUTO: Update deployment hub (new7) for new location defined in new.txt'
+          commit_message: '⚙️ MANUAL: Update deployment hub (new7) for new location defined in new.txt'
           branch: main

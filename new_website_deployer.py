@@ -272,14 +272,15 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     # ------------------ City Name Replacements (Task 8 & 2) ------------------
     city_display = full_city_name.replace('-', ' ')
     
-    # 1. Replace the city name in the header
+    # 1. Replace the city name in the header (Fixed phrase, simple replace is safe)
     content = content.replace('Current Local Conditions: Oklahoma City', f'Current Local Conditions: {city_display}')
     
-    # 2. Replace the main city name instances (often in the title/h1)
-    content = content.replace('Oklahoma City', city_display) 
+    # 2. Replace the main city name instances (use case-insensitive regex for robustness)
+    # The previous simple replace might miss "Oklahoma city" or other casing variations.
+    content = re.sub(r'Oklahoma City', city_display, content, flags=re.IGNORECASE) 
     
-    # 3. Replace the abbreviation (e.g., OKC) with the short city name
-    content = content.replace('OKC', city_name) 
+    # 3. Replace the abbreviation (use case-insensitive regex for robustness)
+    content = re.sub(r'OKC', city_name, content, flags=re.IGNORECASE) 
     
     # ------------------ Coordinates & Citation (Task 1) ------------------
     lat = location_data.get('lat', '0')

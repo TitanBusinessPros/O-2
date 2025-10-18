@@ -70,7 +70,7 @@ def query_overpass(amenity_type, lat, lon):
 
 def create_website_content(city_name, location, wiki_text, amenities):
     debug_log("Rendering HTML content with Jinja2")
-    with open('Ninja-Edit-PLACEHOLDERS.html', 'r', encoding='utf-8') as f:
+    with open('index.html', 'r', encoding='utf-8') as f:
         template = Template(f.read())
     # For simplicity, only including names for amenities, truncated to 3 each
     def extract_names(elements):

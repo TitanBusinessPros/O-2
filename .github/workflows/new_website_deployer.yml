@@ -1,30 +1,39 @@
-name: Deploy City Website
+name: Dynamic Hub Deployment
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  push:
+    paths:
+      # Trigger this workflow whenever the configuration file is modified
+      - 'new.txt'
+    branches:
+      - main  # Only run on the main branch (or your primary branch)
 
 jobs:
-  deploy:
+  update_hub:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Added pyyaml and jinja2 as a best-practice future-proofing step
-        pip install PyGithub requests PyYAML jinja2 
-        
-    - name: Run deployment script
-      env:
-        # Use the secret name as defined in your instructions
-        GH_TOKEN: ${{ secrets.NEW7 }} 
-      run: |
-        python new_website_deployer.py
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          # Install BeautifulSoup for HTML parsing
+          pip install beautifulsoup4
+
+      - name: Run HTML Update Script
+        # Execute the python script that will read new.txt and update Final1.html
+        run: python update_deployment_hub_final.py
+
+      - name: Commit and Push Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          # Check if Final1.html was modified by the script
+          file_pattern: 'Final1.html'
+          # Include the secret name 'new7' in the commit message
+          commit_message: '⚙️ AUTO: Update deployment hub (new7) for new location defined in new.txt'
+          branch: main

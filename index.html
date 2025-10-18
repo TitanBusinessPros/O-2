@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Titan Software Guild: Oklahoma City Deployment Hub</title>
-    <meta name="description" content="Join The Titan Software Guild in Oklahoma City! Master software, AI, and coding with local resources and community support.">
+    <title>The Titan Software Guild: {{CITY_NAME}} Deployment Hub</title>
+    <meta name="description" content="Join The Titan Software Guild in {{CITY_NAME}}! Master software, AI, and coding with local resources and community support.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -937,13 +937,13 @@
 
     <section class="hero">
         <div class="hero-content">
-            <div class="titan-badge">⚡ THE Oklahoma City SOFTWARE GUILD ⚡</div>
+            <div class="titan-badge">⚡ THE {{CITY_NAME}} SOFTWARE GUILD ⚡</div>
             <h1 class="hero-title">
-                The Oklahoma City Titans Are Rising<br>
+                The {{CITY_NAME}} Titans Are Rising<br>
                 <span class="gradient-text">And You Can Be One</span>
             </h1>
             <p class="hero-subtitle">
-                Where beginners, veterans, kids, and even 60-year-olds in the **Oklahoma City** area come together to master the world of software through hands-on projects and AI-powered learning. This is your moment to forge your digital destiny.
+                <!-- WIKI_INTRO -->Where beginners, veterans, kids, and even 60-year-olds in the **{{CITY_NAME}}** area come together to master the world of software through hands-on projects and AI-powered learning. This is your moment to forge your digital destiny.
             </p>
             <div class="cta-buttons">
                 <a href="#join" class="btn btn-primary pulse">Join the Guild Now</a>
@@ -973,7 +973,7 @@
                 Right now, at this very moment, the tools of creation are in your hands. AI has shattered every barrier that once stood between you and building the digital future. Age doesn't matter. Background doesn't matter. What matters is your willingness to rise, to learn, to create.
             </p>
             <p class="mission-text highlight" id="city-blurb-text">
-                **Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team.**
+                **{{CITY_NAME}} ({{CITY_ABBR}}) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. {{CITY_ABBR}} is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team.**
                 <br>The Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives.
             </p>
         </div>
@@ -981,7 +981,7 @@
     
     <section class="local-hub">
         <div class="container">
-            <h2 class="section-title">Local Oklahoma City Tech & Resource Hub</h2>
+            <h2 class="section-title">Local {{CITY_NAME}} Tech & Resource Hub</h2>
             <div class="local-grid">
                 
                 <div class="local-card">
@@ -989,7 +989,7 @@
         </p>
 
     <div id="local-weather-forecast">
-        <h2>Current Local Conditions</h2>
+        <h2>Current Local Conditions <!-- WEATHER_SECTION --></h2>
         <p>Weather data will be updated daily by a separate scheduled GitHub workflow (Source: NOAA National Weather Service).</p>
         <p class="forecast-summary">Please check back in a few hours for the first forecast update.</p>
     </div>
@@ -998,9 +998,9 @@
 </div>
 
                 <div class="local-card">
-                    <h3>Local Library Access</h3>
+                    <h3>Local Library Access <!-- LIBRARIES_SECTION --></h3>
                     <p class="membership-description" style="margin-bottom: 10px;">
-                        No computer? No problem. Access free computers and internet at these local Oklahoma City area libraries:
+                        No computer? No problem. Access free computers and internet at these local {{CITY_NAME}} area libraries:
                     </p>
                     <ul class="library-list">
                         <li>**Downtown Library** | 300 Park Ave | (405) 606-3500</li>
@@ -1010,22 +1010,22 @@
                 </div>
                 
                 <div class="local-card">
-                    <h3>Local Spots to Meet</h3>
+                    <h3>Local Spots to Meet <!-- BARS_SECTION --></h3>
                     <p class="membership-description" style="margin-bottom: 10px;">
-                        Great places in Oklahoma City to network and connect with fellow tech enthusiasts:
+                        Great places in {{CITY_NAME}} to network and connect with fellow tech enthusiasts:
                     </p>
                     <ul class="meetup-list">
-                        <li>**The Jones Assembly** | 901 W Sheridan Ave, Oklahoma City</li>
-                        <li>**Fassler Hall** | 421 NW 10th St, Oklahoma City</li>
-                        <li>**Bricktown Brewery** | 1 N Oklahoma Ave, Oklahoma City</li>
+                        <li>**The Jones Assembly** | 901 W Sheridan Ave, {{CITY_NAME}}</li>
+                        <li>**Fassler Hall** | 421 NW 10th St, {{CITY_NAME}}</li>
+                        <li>**Bricktown Brewery** | 1 N Oklahoma Ave, {{CITY_NAME}}</li>
                     </ul>
                 </div>
 
                 <div class="local-card">
-                    <h3>Restaurants Near Me</h3>
-                    <p class="membership-description" style="margin-bottom: 10px;">Discover amazing local dining spots in Oklahoma City:</p>
+                    <h3>Restaurants Near Me <!-- RESTAURANTS_SECTION --></h3>
+                    <p class="membership-description" style="margin-bottom: 10px;">Discover amazing local dining spots in {{CITY_NAME}}:</p>
                     <ul class="restaurant-list">
-                        <li>**Red PrimeSteak** - Upscale steakhouse in downtown OKC</li>
+                        <li>**Red PrimeSteak** - Upscale steakhouse in downtown {{CITY_ABBR}}</li>
                         <li>**Cheevers Cafe** - Local favorite for American comfort food</li>
                         <li>**The Mule** - Craft beer and gourmet grilled cheese</li>
                     </ul>
@@ -1037,9 +1037,9 @@
                         First impressions matter. Here are three highly-rated, local barbers to get you ready for your next opportunity:
                     </p>
                     <ul class="barber-list">
-                        <li>**Weldon Jack Barber Shop** | 25 NW 9th St, Oklahoma City | (405) 232-7775</li>
-                        <li>**The Gents Place** | 13522 N Pennsylvania Ave, Oklahoma City | (405) 842-8468</li>
-                        <li>**ManCave Barbershop** | 5721 N Western Ave, Oklahoma City | (405) 605-4247</li>
+                        <li>**Weldon Jack Barber Shop** | 25 NW 9th St, {{CITY_NAME}} | (405) 232-7775</li>
+                        <li>**The Gents Place** | 13522 N Pennsylvania Ave, {{CITY_NAME}} | (405) 842-8468</li>
+                        <li>**ManCave Barbershop** | 5721 N Western Ave, {{CITY_NAME}} | (405) 605-4247</li>
                     </ul>
                 </div>
 

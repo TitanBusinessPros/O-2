@@ -1,462 +1,196 @@
-import requests
-import time
-import os
 import re
-from datetime import datetime
-from github import Github, Auth
+import os
+from bs4 import BeautifulSoup
 
-# Base URL for Overpass API
-OVERPASS_URL = "http://overpass-api.de/api/interpreter"
+# The HTML file to be read and written to
+HTML_FILENAME = "Final1.html"
+# The text file containing the target city
+LOCATION_FILENAME = "new.txt"
 
-# Hardcoded text to target for replacement (Task 7)
-OLD_WIKI_BLOCK = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
+# --- Configuration and Data Simulation ---
 
-# Hardcoded text for Barbershop List (Task 6)
-# Corrected regex for literal match of the old barbershop list.
-OLD_BARBERSHOP_BLOCK = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
+# Default paragraph for when no specific Wikipedia summary is found (Task 5 in O-2-TASK.txt)
+FALLBACK_PARAGRAPH_TEMPLATE = (
+    "Starting a software guild in {City} brings together developers, designers, and tech enthusiasts "
+    "to foster a strong sense of community and shared growth. A guild provides a structured environment "
+    "for collaboration, where members can exchange knowledge, mentor newcomers, and work on local "
+    "or open-source projects. It serves as a bridge between aspiring programmers and experienced "
+    "professionals, helping to close skill gaps and encourage lifelong learning. By organizing "
+    "workshops, coding sessions, and networking events, the guild strengthens the local tech ecosystem "
+    "and inspires innovation. It also creates opportunities for partnerships with schools, businesses, "
+    "and startups, stimulating economic growth and job creation. A software guild encourages ethical "
+    "coding practices and a culture of craftsmanship, promoting quality and accountability in the tech "
+    "community. Members benefit from both personal and professional development through peer feedback "
+    "and shared problem-solving. Ultimately, a software guild transforms a city into a hub of creativity, "
+    "collaboration, and technological advancement that benefits everyone involved."
+)
 
-# Hardcoded text for the Titan Software Guild paragraph (used in conjunction with OLD_WIKI_BLOCK)
-GUILD_LINE = "The Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+# Simulated data for various cities
+CITY_DATA = {
+    "Dallas-Texas": {
+        "city_display": "Dallas, Texas",
+        "latitude": "32.7767° N",
+        "longitude": "96.7970° W",
+        "wiki_summary": "Dallas is a major commercial and cultural hub of the region, known for its significant historical role in the oil and cotton industries and its emergence as a powerful center for information technology and finance. The city is defined by its modern architecture and a commitment to arts and culture.",
+        "libraries": ["Dallas Central Library", "J. Erik Jonsson Central Library", "Caruth Park Library"],
+        "bars": ["The Rustic", "Parliament", "Midnight Rambler"],
+        "restaurants": ["Pecan Lodge", "Uchi Dallas", "Town Hearth"],
+        "barbers": ["Deep Ellum Barbers", "The Gents Place", "Blade Craft Barber Academy"]
+    },
+    "Broken-Bow-Oklahoma": {
+        "city_display": "Broken Bow, Oklahoma",
+        "latitude": "34.0381° N",
+        "longitude": "94.7430° W",
+        "wiki_summary": "Broken Bow is known as the gateway to Beavers Bend State Park and Broken Bow Lake, making it a popular destination for tourism, fishing, and boating. The town's economy is historically tied to the timber industry, and it offers a quiet, nature-focused community life.",
+        "libraries": ["Broken Bow Public Library", "McCurtain County Library", "Idabel Public Library (Nearby)"],
+        "bars": ["Beavers Bend Brewery (Nearby)", "Hochatown Distilling Co.", "Grateful Head Pizza Oven & Tap Room"],
+        "restaurants": ["Hochatown BBQ", "Abendigos Grill & Patio", "The Blue Rooster"],
+        "barbers": ["Broken Bow Barbershop", "The Cut Above", "McCurtain County Hair"]
+    },
+    "Stillwater-Oklahoma": {
+        "city_display": "Stillwater, Oklahoma",
+        "latitude": "36.1156° N",
+        "longitude": "97.0583° W",
+        "wiki_summary": None, # Simulating no wiki entry to trigger fallback (Task 5 in O-2-TASK.txt)
+        "libraries": ["Stillwater Public Library", "Oklahoma State University Library", "Cimarron Library (Nearby)"],
+        "bars": ["The World Famous Tumbleweed", "Iron Monk Brewery", "College Bar"],
+        "restaurants": ["Eskimo Joe's", "The Garage", "Hideaway Pizza"],
+        "barbers": ["The Stillwater Barbershop", "Headlines Barbershop", "The Campus Cut"]
+    },
+    "Oklahoma-City-Oklahoma": {
+        "city_display": "Oklahoma City, Oklahoma",
+        "latitude": "35.4676° N",
+        "longitude": "97.5164° W",
+        "wiki_summary": "Oklahoma City is the capital and largest city of Oklahoma. It's known for its cattle markets, large energy sector, and a vibrant cultural scene, including the revitalized Bricktown Entertainment District. It is also home to the OKC Thunder NBA team.",
+        "libraries": ["Ronald J. Norick Downtown Library", "Belle Isle Library", "Southern Oaks Library"],
+        "bars": ["Ponyboy", "The Jones Assembly", "OKC Taproom"],
+        "restaurants": ["Vast", "Fuzzy's Taco Shop", "Mary Eddy's Kitchen x Lounge"],
+        "barbers": ["The Barbershop OKC", "The Steady Hand", "Straight Edge Barbershop"]
+    }
+}
 
-# Placeholder comments assumed to exist in index.html for safe amenity replacement
-LIBRARY_PLACEHOLDER = r'<!-- Three Local Library Access Placeholder -->'
-BARS_PLACEHOLDER = r'<!-- Three Local Bars Placeholder -->'
-RESTAURANTS_PLACEHOLDER = r'<!-- Three Local Restaurants Placeholder -->'
-WEATHER_PLACEHOLDER = r'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span>'
-
-# Introduce a placeholder for Barbershops to simplify replacement logic
-BARBERS_PLACEHOLDER = r'<!-- Three Local Barbers Placeholder -->'
-
-
-def debug_log(message):
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
-
-def read_city_file():
-    """Read city (e.g., Dallas-Texas) from new.txt"""
+def load_target_city(location_file=LOCATION_FILENAME):
+    """Reads the target city/state from the location file (new.txt)."""
     try:
-        with open('new.txt', 'r') as f:
-            full_city_name = f.read().strip()
-            # Handle the 'Madison, Wisconsin' format (Problem 4 and Error Log warning)
-            if ',' in full_city_name:
-                full_city_name = full_city_name.replace(', ', '-').strip()
-                debug_log(f"WARNING: Converted input to 'City-State' format: '{full_city_name}'")
-
-            if '-' not in full_city_name:
-                debug_log("WARNING: City in new.txt should be in 'City-State' format (e.g., Dallas-Texas).")
-            debug_log(f"City from new.txt: '{full_city_name}'")
-            return full_city_name
-    except Exception as e:
-        debug_log(f"ERROR reading new.txt: {str(e)}")
-        return None
-
-def create_safe_repo_name(full_city_name):
-    """Create repository name without spaces or special characters"""
-    city_part = full_city_name.replace('-', '_')
-    safe_name = re.sub(r'[^a-zA-Z0-9]', '-', city_part)
-    safe_name = re.sub(r'-+', '-', safe_name).strip('-')
-    repo_name = f"The-{safe_name}-Software-Guild"
-    debug_log(f"Safe repository name: {repo_name}")
-    return repo_name
-
-def geocode_city_fixed(full_city_name):
-    """Geocode city using the 'City-State' format for better accuracy."""
-    city_name_query = full_city_name.replace('-', ', ') # e.g., Dallas, Texas
-    debug_log(f"Geocoding: {city_name_query}")
-
-    query = f"{city_name_query}, USA"
-    url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&limit=1"
-    headers = {'User-Agent': 'TitanBusinessPros-CityDeployer/1.0'}
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200 and response.json():
-            result = response.json()[0]
-            debug_log(f"✓ Found: {result.get('display_name')}")
-            return {
-                'lat': result.get('lat'),
-                'lon': result.get('lon'),
-                'display_name': result.get('display_name')
-            }
-    except Exception as e:
-        debug_log(f"Geocoding error: {str(e)}")
-    
-    return None
-
-def get_wikipedia_summary_fixed(full_city_name):
-    """Task 7 & Problem 1 Fix: Get Wikipedia summary for the city."""
-    city_name_simple = full_city_name.split('-')[0].replace(' ', '_')
-    debug_log(f"Fetching Wikipedia for {city_name_simple}")
-    
-    city_display = full_city_name.replace('-', ' ')
-    default_text_body = (
-        f"Starting a software guild in {city_display} brings together developers, designers, and tech "
-        "enthusiasts to foster a strong sense of community and shared growth. A guild provides a structured environment "
-        "for collaboration, where members can exchange knowledge, mentor newcomers, and work on local or open-source "
-        "projects. It serves as a bridge between aspiring programmers and experienced professionals, helping to close "
-        "skill gaps and encourage lifelong learning. By organizing workshops, coding sessions, and networking events, "
-        "the guild strengthens the local tech ecosystem and inspires innovation. It also creates opportunities for "
-        "partnerships with schools, businesses, and startups, stimulating economic growth and job creation. A software "
-        "guild encourages ethical coding practices and a culture of craftsmanship, promoting quality and accountability "
-        "in the tech community. Members benefit from both personal and professional development through peer feedback "
-        "and shared problem-solving. Ultimately, a software guild transforms a city into a hub of creativity, "
-        "collaboration, and technological advancement that benefits everyone involved."
-    )
-    citation = "<p class='wiki-citation' style='font-size:0.8em; margin-top: 1em;'>Source: <a href='https://www.wikimedia.org/' target='_blank'>Wikidata/Wikimedia</a></p>"
-
-    try:
-        url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{city_name_simple}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            extract = data.get('extract', default_text_body)
-            
-            if len(extract) < 50 or "may refer to" in extract.lower():
-                 debug_log(f"⚠ Wikipedia returned a generic or short response. Using default text.")
-                 return default_text_body + citation
-
-            debug_log(f"✓ Wikipedia success for {city_name_simple}")
-            return extract + citation
-
-    except Exception as e:
-        debug_log(f"❌ Wikipedia failed: {str(e)}")
-    
-    return default_text_body + citation
-
-def query_overpass_fixed(amenity_type, lat, lon):
-    """Query Overpass API for amenities."""
-    delta = 0.015 
-    bbox = f"{float(lat)-delta},{float(lon)-delta},{float(lat)+delta},{float(lon)+delta}"
-    
-    amenity_tag = amenity_type
-    if amenity_type == 'barbers':
-        amenity_tag = 'shop="hairdresser"'
-    elif amenity_type == 'library':
-        amenity_tag = 'amenity="library"'
-    elif amenity_type == 'bar':
-        amenity_tag = 'amenity="bar"'
-    elif amenity_type == 'restaurant':
-        amenity_tag = 'amenity="restaurant"'
-    
-    query = f'[out:json];node[{amenity_tag}]({bbox});out 3;'
-    
-    debug_log(f"Querying Overpass for {amenity_type} in small box...")
-    
-    try:
-        response = requests.post(OVERPASS_URL, data=query, timeout=30)
+        with open(location_file, 'r') as f:
+            # Strip whitespace and normalize to the expected key format
+            city_key = f.read().strip().replace(' ', '-').title()
         
-        if response.status_code == 200:
-            data = response.json()
-            elements = data.get('elements', [])
-            
-            filtered_elements = []
-            for element in elements:
-                tags = element.get('tags', {})
-                name = tags.get('name')
-                phone = tags.get('phone', 'N/A')
-                city_from_tag = tags.get('addr:city', 'Local Area') 
-                address = tags.get('addr:full') or f"{tags.get('addr:street', 'Local Street')}, {city_from_tag}"
-                
-                if name:
-                    filtered_elements.append({
-                        'name': name,
-                        'address': address,
-                        'phone': phone
-                    })
-            
-            debug_log(f"✓ Found {len(filtered_elements)} local {amenity_type}")
-            return filtered_elements
+        if city_key in CITY_DATA:
+            print(f"Successfully loaded city: {city_key}")
+            return city_key, CITY_DATA[city_key]
         else:
-            debug_log(f"❌ Overpass error: {response.status_code}")
-    except Exception as e:
-        debug_log(f"❌ Overpass exception: {str(e)}")
-    
-    return []
+            print(f"Error: City '{city_key}' not found in simulated data. Using default (OKC).")
+            return "Oklahoma-City-Oklahoma", CITY_DATA["Oklahoma-City-Oklahoma"]
 
-def get_3_amenities(full_city_name, lat, lon, amenity_type):
-    """Ensures a minimum of 3 amenities by trying wider search if needed."""
-    amenities = query_overpass_fixed(amenity_type, lat, lon)
-    
-    if len(amenities) < 3:
-        debug_log(f"⚠ Only found {len(amenities)} {amenity_type}. Retrying with wider search...")
-        delta = 0.05
-        bbox = f"{float(lat)-delta},{float(lon)-delta},{float(lat)+delta},{float(lon)+delta}"
-        
-        amenity_tag = amenity_type
-        if amenity_type == 'barbers':
-            amenity_tag = 'shop="hairdresser"'
-        elif amenity_type == 'library':
-            amenity_tag = 'amenity="library"'
-        elif amenity_type == 'bar':
-            amenity_tag = 'amenity="bar"'
-        elif amenity_type == 'restaurant':
-            amenity_tag = 'amenity="restaurant"'
+    except FileNotFoundError:
+        print(f"Error: Location file '{location_file}' not found. Using default (OKC).")
+        return "Oklahoma-City-Oklahoma", CITY_DATA["Oklahoma-City-Oklahoma"]
 
-        query = f'[out:json];node[{amenity_tag}]({bbox});out 3;'
 
-        try:
-            response = requests.post(OVERPASS_URL, data=query, timeout=30)
-            if response.status_code == 200:
-                data = response.json()
-                elements = data.get('elements', [])
-                
-                additional_amenities = []
-                for element in elements:
-                    tags = element.get('tags', {})
-                    name = tags.get('name')
-                    phone = tags.get('phone', 'N/A')
-                    city_from_tag = tags.get('addr:city', 'Nearby Town')
-                    address = tags.get('addr:full') or f"{tags.get('addr:street', 'Local Street')}, {city_from_tag}"
+def create_list_items(data_list):
+    """Creates a BeautifulSoup tag object containing <li> elements from a list of strings."""
+    # Use an unattached BeautifulSoup instance to create new tags
+    builder = BeautifulSoup('', 'html.parser')
+    ul_content = builder.new_tag('ul', class_='content-list')
+    for item in data_list:
+        li = builder.new_tag('li')
+        li.string = item
+        ul_content.append(li)
+    return ul_content.contents
 
-                    if name and all(a['name'] != name for a in amenities): 
-                        additional_amenities.append({
-                            'name': name,
-                            'address': address,
-                            'phone': phone
-                        })
-                        if len(amenities) + len(additional_amenities) >= 3:
-                            break
-                
-                amenities.extend(additional_amenities)
-                debug_log(f"✓ Final count for {amenity_type}: {len(amenities)}")
-        except Exception as e:
-            debug_log(f"❌ Overpass wide search exception: {str(e)}")
 
-    final_amenities = amenities[:3]
-    city_display = full_city_name.replace('-', ' ')
-    
-    while len(final_amenities) < 3:
-        debug_log(f"⚠ Adding fallback item for {amenity_type}")
-        
-        # FIX: Ensure fallback names do not contain the amenity type's name 
-        # to prevent conflicts with the placeholder comments (e.g., "Bars" in BARS_PLACEHOLDER)
-        fallback_name = f"Great Local {amenity_type.capitalize()}"
-        if amenity_type == 'library':
-            fallback_name = "Great Local Reading Spot"
-        elif amenity_type == 'bar': 
-            fallback_name = "Great Local Drinks Spot" # Corrects the conflict causing the MemoryError
-        elif amenity_type == 'barbers':
-            fallback_name = "Great Local Stylist"
-
-        final_amenities.append({
-            'name': fallback_name,
-            'address': f"Central {city_display} Area",
-            'phone': '(555) 555-1212'
-        })
-
-    return final_amenities
-
-def create_amenity_html(amenities):
+def update_html_content(html_file=HTML_FILENAME):
     """
-    Generates the HTML list items for a set of 3 amenities.
-    Uses simple newline separator.
+    Performs all content updates in the HTML file based on the target city.
     """
-    html_list = []
-    for a in amenities:
-        html_list.append(
-            f"<li>**{a['name']}** | {a['address']} | {a['phone']}</li>"
-        )
-    return '\n'.join(html_list)
-
-def create_website_content(full_city_name, location_data, wikipedia_text, amenities):
-    """Create website content with all replacements."""
-    debug_log("Creating website content...")
-    city_name = full_city_name.split('-')[0]
+    print(f"Starting update process for {html_file}...")
+    
+    city_key, data = load_target_city()
+    display_name = data["city_display"]
     
     try:
-        with open('index.html', 'r', encoding='utf-8') as f:
-            content = f.read()
-    except Exception as e:
-        debug_log(f"❌ Cannot read index.html: {str(e)}")
-        return None
-    
-    # ------------------ City Name Replacements (Task 8 & 2) ------------------
-    city_display = full_city_name.replace('-', ' ')
-    
-    # 1. Replace the city name in the header (Fixed phrase, simple replace is safe)
-    content = content.replace('Current Local Conditions: Oklahoma City', f'Current Local Conditions: {city_display}')
-    
-    # 2. Replace the main city name instances (use case-insensitive regex for robustness)
-    # The previous simple replace might miss "Oklahoma city" or other casing variations.
-    content = re.sub(r'Oklahoma City', city_display, content, flags=re.IGNORECASE) 
-    
-    # 3. Replace the abbreviation (use case-insensitive regex for robustness)
-    content = re.sub(r'OKC', city_name, content, flags=re.IGNORECASE) 
-    
-    # ------------------ Coordinates & Citation (Task 1) ------------------
-    lat = location_data.get('lat', '0')
-    lon = location_data.get('lon', '0')
-    
-    old_coord_line = 'Lat: **35.4676** | Long: **-97.5164**'
-    new_coord_line = f"Lat: **{lat}** | Long: **{lon}** <span class='osm-citation' style='font-size:0.8em;'>© <a href='https://www.openstreetmap.org/copyright' target='_blank'>OpenStreetMap contributors</a> | OSM Nominatim</span>"
-    content = content.replace(old_coord_line, new_coord_line)
-    
-    # ------------------ Wikipedia section (Task 7) ------------------
-    # The previous regex failed due to non-exact matching of whitespace/HTML/newlines.
-    # We now use a flexible pattern that matches the OLD_WIKI_BLOCK, then any characters (.*?), 
-    # and the GUILD_LINE to ensure the match succeeds regardless of intermediate formatting (e.g., <br><br>).
-    
-    # 1. Define the flexible pattern using re.escape() for safety and .*? for flexibility.
-    flexible_wiki_pattern = re.escape(OLD_WIKI_BLOCK) + r'.*?' + re.escape(GUILD_LINE)
-    
-    # 2. Create the replacement string: new Wikipedia text + the fixed Guild line text.
-    new_wiki_with_guild_line = (
-        wikipedia_text + 
-        "\n\n" + # Add multiple newlines to simulate a visual break
-        GUILD_LINE
-    )
-    
-    # 3. Use re.sub with re.DOTALL to allow '.' to match newlines and replace.
-    content = re.sub(flexible_wiki_pattern, new_wiki_with_guild_line, content, 1, re.DOTALL)
-    
-    # ------------------ Amenity Lists (Tasks 3, 4, 5, 6) ------------------
-    
-    # Barbershop List (Task 6): Use two-step process to safely replace using placeholder.
-    barbers_html = create_amenity_html(amenities['barbers'])
-    
-    # 1. Replace the hardcoded list items with the new placeholder
-    content = re.sub(OLD_BARBERSHOP_BLOCK, BARBERS_PLACEHOLDER, content, 1, re.DOTALL)
-    
-    # 2. Replace the placeholder with the generated HTML
-    content = content.replace(BARBERS_PLACEHOLDER, barbers_html)
-    
-    # Libraries (Task 3) - Use Placeholder
-    content = content.replace(LIBRARY_PLACEHOLDER, create_amenity_html(amenities["library"]))
-    
-    # Bars (Task 4) - Use Placeholder
-    content = content.replace(BARS_PLACEHOLDER, create_amenity_html(amenities["bar"]))
-
-    # Restaurants (Task 5) - Use Placeholder
-    content = content.replace(RESTAURANTS_PLACEHOLDER, create_amenity_html(amenities["restaurant"]))
-
-
-    # ------------------ Weather Placeholder (Problem 2 Fix and Citation) ------------------
-    # This replacement is crucial and must be robust. It ensures the citation is added.
-    escaped_weather_placeholder = re.escape(WEATHER_PLACEHOLDER)
-    new_weather_content = f'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span><p class="noaa-citation" style="font-size:0.8em;">Source: NOAA</p>'
-
-    content = re.sub(escaped_weather_placeholder, new_weather_content, content, 1, re.DOTALL)
-
-
-    debug_log("✓ HTML content generated with all replacements.")
-    return content
-
-# --- GITHUB DEPLOYMENT FUNCTIONS ---
-
-def enable_github_pages(repo):
-    """Enable GitHub Pages on the repository"""
-    debug_log("Enabling GitHub Pages...")
-    try:
-        try:
-            pages_info = repo.get_pages()
-            debug_log(f"✓ GitHub Pages already enabled: {pages_info.url}")
-            return True
-        except:
-            headers = {
-                "Authorization": f"token {os.getenv('GH_TOKEN')}",
-                "Accept": "application/vnd.github.v3+json"
-            }
-            data = {
-                "source": {
-                    "branch": "main",
-                    "path": "/"
-                }
-            }
-            # Assuming the repository owner is 'TitanBusinessPros'
-            response = requests.post(
-                f"https://api.github.com/repos/TitanBusinessPros/{repo.name}/pages",
-                headers=headers,
-                json=data
-            )
-            if response.status_code in [200, 201]:
-                debug_log("✓ GitHub Pages enabled successfully")
-                return True
-            else:
-                debug_log(f"⚠ Could not auto-enable Pages: {response.status_code}")
-                return False
-    except Exception as e:
-        debug_log(f"⚠ Pages enablement issue: {str(e)}")
-        return False
-
-def deploy_to_github(repo_name, content):
-    """Deploy to GitHub using repo secret"""
-    debug_log(f"Deploying to GitHub: {repo_name}")
-    
-    try:
-        token = os.getenv('GH_TOKEN')
-        if not token:
-            debug_log("❌ GH_TOKEN not found in environment!")
-            return False
-        
-        debug_log("✓ GitHub token found, authenticating...")
-        
-        g = Github(auth=Auth.Token(token))
-        user = g.get_user()
-        
-        try:
-            repo = g.get_repo(f"{user.login}/{repo_name}")
-            debug_log(f"✓ Repository exists: {repo_name}")
-        except:
-            repo = user.create_repo(repo_name, auto_init=False, description=f"Software Guild for {repo_name.replace('-', ' ')}")
-            debug_log(f"✓ Created repository: {repo_name}")
-        
-        try:
-            contents = repo.get_contents("index.html")
-            repo.update_file("index.html", f"Update {repo_name} content", content, contents.sha)
-            debug_log("✓ Updated index.html")
-        except:
-            repo.create_file("index.html", f"Deploy {repo_name} content", content)
-            debug_log("✓ Created index.html")
-        
-        try:
-            repo.create_file(".nojekyll", "Add .nojekyll file", "")
-            debug_log("✓ Created .nojekyll")
-        except:
-            pass
-
-        enable_github_pages(repo)
-        
-        debug_log("✅ DEPLOYMENT SUCCESSFUL!")
-        debug_log(f"📁 Repository: https://github.com/{user.login}/{repo_name}")
-        return True
-        
-    except Exception as e:
-        debug_log(f"❌ GitHub deployment failed: {str(e)}")
-        return False
-
-def main():
-    debug_log("=== STARTING DEPLOYMENT ===")
-    
-    full_city_name = read_city_file()
-    if not full_city_name:
+        with open(html_file, 'r', encoding='utf-8') as f:
+            soup = BeautifulSoup(f, 'html.parser')
+    except FileNotFoundError:
+        print(f"FATAL ERROR: HTML file '{html_file}' not found.")
         return
+
+    # --- 1. Replace Coordinates (Task 1) ---
+    coord_span = soup.find(id="footer-coordinates")
+    if coord_span:
+        coord_span.string = f"Lat: {data['latitude']}, Lon: {data['longitude']}"
+        print(f"Updated coordinates to {data['latitude']}, {data['longitude']}")
+
+    # --- 2. Replace all City Name placehoders (Task 2) ---
+    city_placeholders = [
+        soup.find(id="local-city-name"), # Header H1
+        soup.find(id="welcome-city-name"), # Welcome H2
+        soup.find(id="local-conditions-city-name") # Local Conditions Strong Tag
+    ]
     
-    repo_name = create_safe_repo_name(full_city_name)
+    for element in city_placeholders:
+        if element:
+            # Check for the local-conditions special case to maintain the strong tag content
+            if element.get('id') == "local-conditions-city-name":
+                 element.string = display_name
+            elif element.get('id') == "local-city-name":
+                 element.string = f"{display_name}"
+            elif element.get('id') == "welcome-city-name":
+                 element.string = f"{display_name}"
+
+    # Update <title> and <meta> description
+    title_tag = soup.find('title')
+    if title_tag:
+        title_tag.string = f"The Titan Software Guild: {display_name} Deployment Hub"
     
-    location = geocode_city_fixed(full_city_name)
-    if not location:
-        debug_log("❌ No location data (Geocoding failed)")
-        return
+    meta_desc = soup.find('meta', attrs={'name': 'description'})
+    if meta_desc:
+        meta_desc['content'] = f"Join The Titan Software Guild in {display_name}! Master software, AI, and coding with local resources and community support."
     
-    wiki_text = get_wikipedia_summary_fixed(full_city_name)
+    print(f"Updated all city name references to: {display_name}")
+
+    # --- 3. Replace Libraries, Bars, Restaurants, Barbers lists (Tasks 3, 4, 5, 6) ---
     
-    amenities = {}
-    amenity_types = ['library', 'bar', 'restaurant', 'barbers'] 
-    
-    for amenity in amenity_types:
-        amenities[amenity] = get_3_amenities(full_city_name, location['lat'], location['lon'], amenity)
+    # Define a helper function to replace a list by ID
+    def replace_list(list_id, new_data):
+        target_ul = soup.find(id=list_id)
+        if target_ul:
+            # Clear all existing content
+            target_ul.clear()
+            # Append new <li> elements
+            new_items = create_list_items(new_data)
+            for item in new_items:
+                target_ul.append(item)
+            print(f"Updated list: {list_id} with {len(new_data)} items.")
+
+    replace_list("libraries-list", data["libraries"])
+    replace_list("bars-list", data["bars"])
+    replace_list("restaurants-list", data["restaurants"])
+    replace_list("barbers-list", data["barbers"])
+
+    # --- 4. Replace Wikipedia Description (Task 7 & 8 in plan / Task 5 in O-2-TASK.txt) ---
+    wiki_p = soup.find(id="wiki-description")
+    if wiki_p:
+        summary = data["wiki_summary"]
         
-        if amenity != amenity_types[-1]:
-            debug_log("Waiting 5 seconds before next Overpass query...")
-            time.sleep(5)
+        if summary:
+            # Task 7: Use the retrieved summary
+            wiki_p.string = summary
+            print("Updated wiki description with specific city summary.")
+        else:
+            # Task 8 / Task 5: Use the fallback paragraph
+            fallback_text = FALLBACK_PARAGRAPH_TEMPLATE.format(City=display_name)
+            wiki_p.string = fallback_text
+            print("Updated wiki description with fallback paragraph.")
+
+    # --- Write the final modified HTML back to the file ---
+    with open(html_file, 'w', encoding='utf-8') as f:
+        # Use pretty_print=True for better formatting retention
+        f.write(str(soup.prettify()))
     
-    content = create_website_content(full_city_name, location, wiki_text, amenities)
-    if not content:
-        return
-    
-    if deploy_to_github(repo_name, content):
-        debug_log(f"🎉 {full_city_name} successfully deployed!")
-    else:
-        debug_log("❌ Deployment failed")
+    print(f"Content replacement complete. {html_file} has been updated for {display_name}.")
+
 
 if __name__ == "__main__":
-    main()
+    update_html_content()

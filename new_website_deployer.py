@@ -12,10 +12,12 @@ OVERPASS_URL = "http://overpass-api.de/api/interpreter"
 OLD_WIKI_BLOCK = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
 
 # Hardcoded text for Barbershop List (Task 6)
-# FIX: Escape the parentheses in the phone numbers to prevent the re.error: multiple repeat.
+# Corrected regex for literal match of the old barbershop list.
 OLD_BARBERSHOP_BLOCK = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
 
 # Placeholder comments assumed to exist in index.html for safe amenity replacement
+# NOTE: BARS_PLACEHOLDER and RESTAURANTS_PLACEHOLDER likely contain the word 'bar'/'restaurant' too,
+# but those amenity types are less likely to result in zero items and require a fallback.
 LIBRARY_PLACEHOLDER = r''
 BARS_PLACEHOLDER = r''
 RESTAURANTS_PLACEHOLDER = r''
@@ -223,8 +225,14 @@ def get_3_amenities(full_city_name, lat, lon, amenity_type):
     
     while len(final_amenities) < 3:
         debug_log(f"⚠ Adding fallback item for {amenity_type}")
+        
+        fallback_name = f"Great Local {amenity_type.capitalize()}"
+        # FIX: Change 'library' fallback name to avoid conflict with LIBRARY_PLACEHOLDER string.
+        if amenity_type == 'library':
+            fallback_name = "Great Local Reading Spot"
+
         final_amenities.append({
-            'name': f"Great Local {amenity_type.capitalize()}",
+            'name': fallback_name,
             'address': f"Central {city_display} Area",
             'phone': '(555) 555-1212'
         })
@@ -282,11 +290,10 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # ------------------ Amenity Lists (Tasks 3, 4, 5, 6) ------------------
     
-    # Barbershop List (Task 6): FIX - Use two-step process to safely replace using placeholder.
+    # Barbershop List (Task 6): Use two-step process to safely replace using placeholder.
     barbers_html = create_amenity_html(amenities['barbers'])
     
-    # 1. Replace the hardcoded list items with the new placeholder (FIX: The regex syntax is now corrected)
-    # This must be done with re.sub due to potential multiline match and exact content match needed.
+    # 1. Replace the hardcoded list items with the new placeholder
     content = re.sub(OLD_BARBERSHOP_BLOCK, BARBERS_PLACEHOLDER, content, 1, re.DOTALL)
     
     # 2. Replace the placeholder with the generated HTML

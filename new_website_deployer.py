@@ -24,7 +24,7 @@ def geocode_city_fixed(city_name):
     """Force correct major city detection"""
     debug_log(f"Geocoding: {city_name}")
     
-    # Hardcode coordinates for major cities to avoid wrong detection
+    # Hardcode coordinates for major cities
     major_cities = {
         "Nashville": {"lat": "36.1627", "lon": "-86.7816", "display_name": "Nashville, Tennessee, USA"},
         "Detroit": {"lat": "42.3314", "lon": "-83.0458", "display_name": "Detroit, Michigan, USA"},
@@ -35,12 +35,7 @@ def geocode_city_fixed(city_name):
         "New York": {"lat": "40.7128", "lon": "-74.0060", "display_name": "New York, New York, USA"},
         "Los Angeles": {"lat": "34.0522", "lon": "-118.2437", "display_name": "Los Angeles, California, USA"},
         "Miami": {"lat": "25.7617", "lon": "-80.1918", "display_name": "Miami, Florida, USA"},
-        "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"},
-        "Phoenix": {"lat": "33.4484", "lon": "-112.0740", "display_name": "Phoenix, Arizona, USA"},
-        "Philadelphia": {"lat": "39.9526", "lon": "-75.1652", "display_name": "Philadelphia, Pennsylvania, USA"},
-        "Houston": {"lat": "29.7604", "lon": "-95.3698", "display_name": "Houston, Texas, USA"},
-        "Denver": {"lat": "39.7392", "lon": "-104.9903", "display_name": "Denver, Colorado, USA"},
-        "Atlanta": {"lat": "33.7490", "lon": "-84.3880", "display_name": "Atlanta, Georgia, USA"}
+        "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"}
     }
     
     if city_name in major_cities:
@@ -79,46 +74,17 @@ def get_wikipedia_summary_fixed(city_name):
         debug_log(f"Wikipedia failed: {str(e)}")
     
     # Fallback description
-    return f"{city_name} is a vibrant city with a rich history and growing technology sector, offering numerous opportunities for software developers and tech professionals. The city has become a hub for innovation and digital transformation in recent years."
+    return f"{city_name} is a vibrant city with a rich history and growing technology sector, offering numerous opportunities for software developers and tech professionals."
 
 def query_overpass_fixed(amenity_type, lat, lon):
     """Query Overpass API with proper delays"""
-    # Create bounding box around coordinates
     bbox = f"{float(lat)-0.3},{float(lon)-0.3},{float(lat)+0.3},{float(lon)+0.3}"
     
     queries = {
-        'libraries': f"""
-            [out:json][timeout:30];
-            (
-                node["amenity"="library"]({bbox});
-                way["amenity"="library"]({bbox});
-            );
-            out center;
-        """,
-        'bars': f"""
-            [out:json][timeout:30];
-            (
-                node["amenity"="bar"]({bbox});
-                way["amenity"="bar"]({bbox});
-            );
-            out center;
-        """,
-        'restaurants': f"""
-            [out:json][timeout:30];
-            (
-                node["amenity"="restaurant"]({bbox});
-                way["amenity"="restaurant"]({bbox});
-            );
-            out center;
-        """,
-        'barbers': f"""
-            [out:json][timeout:30];
-            (
-                node["shop"="hairdresser"]({bbox});
-                way["shop"="hairdresser"]({bbox});
-            );
-            out center;
-        """
+        'libraries': f'[out:json];node["amenity"="library"]({bbox});out;',
+        'bars': f'[out:json];node["amenity"="bar"]({bbox});out;',
+        'restaurants': f'[out:json];node["amenity"="restaurant"]({bbox});out;',
+        'barbers': f'[out:json];node["shop"="hairdresser"]({bbox});out;'
     }
     
     debug_log(f"Querying Overpass for {amenity_type}...")
@@ -164,34 +130,25 @@ def create_website_content(city_name, location_data, wikipedia_text, amenities):
     content = content.replace('-97.5164', lon)
     
     # Replace Wikipedia section
-    old_wiki_text = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
-    
-    # Add Wikipedia citation
-    wiki_with_citation = f"{wikipedia_text}<p><em>Source: Wikipedia</em></p>"
-    content = content.replace(old_wiki_text, wiki_with_citation)
-    
-    # Add OSM citation near coordinates
-    osm_citation = " | Data © OpenStreetMap contributors"
-    if "Oklahoma City" in content:  # If there are any remaining instances
-        content = content.replace("Oklahoma City", city_name)
+    old_wiki_text = "Oklahoma City (OKC) is the capital and largest city of Oklahoma."
+    new_wiki_section = f"{wikipedia_text}"
+    content = content.replace(old_wiki_text, new_wiki_section)
     
     debug_log("✓ Template replacements completed")
     return content
 
 def deploy_to_github(repo_name, content):
-    """Deploy to GitHub with proper authentication"""
+    """Deploy to GitHub using repo secret"""
     debug_log(f"Deploying to GitHub: {repo_name}")
     
     try:
-        # Use GH_TOKEN from environment
+        # Use GH_TOKEN from repository secret
         token = os.getenv('GH_TOKEN')
         if not token:
-            debug_log("❌ GH_TOKEN environment variable not found!")
-            debug_log("Available env vars:")
-            for key in os.environ:
-                if 'token' in key.lower() or 'github' in key.lower():
-                    debug_log(f"  {key}: {'*' * len(os.environ[key])}")
+            debug_log("❌ GH_TOKEN not found in environment!")
             return False
+        
+        debug_log("✓ GitHub token found, authenticating...")
         
         # Use proper authentication
         g = Github(auth=Auth.Token(token))
@@ -214,24 +171,9 @@ def deploy_to_github(repo_name, content):
             repo.create_file("index.html", f"Deploy {repo_name}", content)
             debug_log("✓ Created index.html")
         
-        # Enable GitHub Pages using the API
-        try:
-            # First, check if Pages is already enabled
-            pages_info = repo.get_pages()
-            debug_log(f"✓ GitHub Pages already enabled: {pages_info.url}")
-        except:
-            # If not enabled, try to enable it
-            try:
-                repo.create_pages_site(branch="main", path="/")
-                debug_log("✓ Enabled GitHub Pages via API")
-            except Exception as e:
-                debug_log(f"Note: May need manual Pages setup: {str(e)}")
-                debug_log(f"Go to: https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
-                debug_log("Select 'Deploy from a branch' and choose 'main' branch")
-        
         debug_log("✅ DEPLOYMENT SUCCESSFUL!")
         debug_log(f"📁 Repository: https://github.com/TitanBusinessPros/{repo_name}")
-        debug_log(f"🌐 Pages URL: https://TitanBusinessPros.github.io/{repo_name}")
+        debug_log(f"🔧 Enable Pages: https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
         return True
         
     except Exception as e:
@@ -261,7 +203,7 @@ def main():
     
     for amenity in amenity_types:
         amenities[amenity] = query_overpass_fixed(amenity, location['lat'], location['lon'])
-        if amenity != amenity_types[-1]:  # Don't wait after the last query
+        if amenity != amenity_types[-1]:
             debug_log("Waiting 5 seconds before next Overpass query...")
             time.sleep(5)
     

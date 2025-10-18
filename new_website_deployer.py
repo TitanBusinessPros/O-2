@@ -1,8 +1,6 @@
-# new_website_deployer.py
 import requests
 import time
 import os
-import json
 from datetime import datetime
 from github import Github, Auth
 
@@ -24,7 +22,6 @@ def geocode_city_fixed(city_name):
     """Force correct major city detection"""
     debug_log(f"Geocoding: {city_name}")
     
-    # Hardcode coordinates for major cities
     major_cities = {
         "Nashville": {"lat": "36.1627", "lon": "-86.7816", "display_name": "Nashville, Tennessee, USA"},
         "Detroit": {"lat": "42.3314", "lon": "-83.0458", "display_name": "Detroit, Michigan, USA"},
@@ -42,7 +39,6 @@ def geocode_city_fixed(city_name):
         debug_log(f"✓ Using pre-defined coordinates for {city_name}")
         return major_cities[city_name]
     
-    # Fallback for other cities
     query = f"{city_name}, USA"
     url = f"https://nominatim.openstreetmap.org/search?format=json&q={query}&limit=1"
     headers = {'User-Agent': 'TitanBusinessPros-CityDeployer/1.0'}
@@ -73,8 +69,7 @@ def get_wikipedia_summary_fixed(city_name):
     except Exception as e:
         debug_log(f"Wikipedia failed: {str(e)}")
     
-    # Fallback description
-    return f"{city_name} is a vibrant city with a rich history and growing technology sector, offering numerous opportunities for software developers and tech professionals."
+    return f"{city_name} is a vibrant city with a rich history and growing technology sector."
 
 def query_overpass_fixed(amenity_type, lat, lon):
     """Query Overpass API with proper delays"""

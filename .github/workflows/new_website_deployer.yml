@@ -7,11 +7,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -32,6 +27,6 @@ jobs:
         
     - name: Deploy website
       env:
-        GH_TOKEN: ${{ secrets.PAT }}  # Use your PAT named "NEW7"
+        GH_TOKEN: ${{ secrets.NEW7 }}  # Use your actual secret name
       run: |
         python new_website_deployer.py

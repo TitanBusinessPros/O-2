@@ -15,6 +15,9 @@ OLD_WIKI_BLOCK = "Oklahoma City (OKC) is the capital and largest city of Oklahom
 # Corrected regex for literal match of the old barbershop list.
 OLD_BARBERSHOP_BLOCK = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
 
+# Hardcoded text for the Titan Software Guild paragraph (used in conjunction with OLD_WIKI_BLOCK)
+GUILD_LINE = "The Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+
 # Placeholder comments assumed to exist in index.html for safe amenity replacement
 LIBRARY_PLACEHOLDER = r'<!-- Three Local Library Access Placeholder -->'
 BARS_PLACEHOLDER = r'<!-- Three Local Bars Placeholder -->'
@@ -268,9 +271,14 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # ------------------ City Name Replacements (Task 8 & 2) ------------------
     city_display = full_city_name.replace('-', ' ')
-    # Using str.replace for simple strings is fine, but we will ensure robustness for key replacements.
+    
+    # 1. Replace the city name in the header
     content = content.replace('Current Local Conditions: Oklahoma City', f'Current Local Conditions: {city_display}')
+    
+    # 2. Replace the main city name instances (often in the title/h1)
     content = content.replace('Oklahoma City', city_display) 
+    
+    # 3. Replace the abbreviation (e.g., OKC) with the short city name
     content = content.replace('OKC', city_name) 
     
     # ------------------ Coordinates & Citation (Task 1) ------------------
@@ -282,22 +290,22 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     content = content.replace(old_coord_line, new_coord_line)
     
     # ------------------ Wikipedia section (Task 7) ------------------
-    # Use re.sub with re.DOTALL and re.escape to make the replacement robust against whitespace variations.
+    # The previous regex failed due to non-exact matching of whitespace/HTML/newlines.
+    # We now use a flexible pattern that matches the OLD_WIKI_BLOCK, then any characters (.*?), 
+    # and the GUILD_LINE to ensure the match succeeds regardless of intermediate formatting (e.g., <br><br>).
     
-    # 1. Define the exact string to be replaced (the pattern)
-    old_wiki_with_guild_line_pattern = OLD_WIKI_BLOCK + "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+    # 1. Define the flexible pattern using re.escape() for safety and .*? for flexibility.
+    flexible_wiki_pattern = re.escape(OLD_WIKI_BLOCK) + r'.*?' + re.escape(GUILD_LINE)
     
-    # 2. Escape any special regex characters in the pattern
-    escaped_pattern = re.escape(old_wiki_with_guild_line_pattern)
-    
-    # 3. Create the replacement string
+    # 2. Create the replacement string: new Wikipedia text + the fixed Guild line text.
     new_wiki_with_guild_line = (
         wikipedia_text + 
-        "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+        "\n\n" + # Add multiple newlines to simulate a visual break
+        GUILD_LINE
     )
     
-    # 4. Use re.sub with re.DOTALL to match the pattern across newlines/whitespace variations
-    content = re.sub(escaped_pattern, new_wiki_with_guild_line, content, 1, re.DOTALL)
+    # 3. Use re.sub with re.DOTALL to allow '.' to match newlines and replace.
+    content = re.sub(flexible_wiki_pattern, new_wiki_with_guild_line, content, 1, re.DOTALL)
     
     # ------------------ Amenity Lists (Tasks 3, 4, 5, 6) ------------------
     
@@ -321,7 +329,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
 
 
     # ------------------ Weather Placeholder (Problem 2 Fix and Citation) ------------------
-    # Use re.sub to replace the weather placeholder, accounting for potential formatting differences.
+    # This replacement is crucial and must be robust. It ensures the citation is added.
     escaped_weather_placeholder = re.escape(WEATHER_PLACEHOLDER)
     new_weather_content = f'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span><p class="noaa-citation" style="font-size:0.8em;">Source: NOAA</p>'
 

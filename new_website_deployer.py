@@ -16,15 +16,13 @@ OLD_WIKI_BLOCK = "Oklahoma City (OKC) is the capital and largest city of Oklahom
 OLD_BARBERSHOP_BLOCK = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
 
 # Placeholder comments assumed to exist in index.html for safe amenity replacement
-# NOTE: BARS_PLACEHOLDER and RESTAURANTS_PLACEHOLDER likely contain the word 'bar'/'restaurant' too,
-# but those amenity types are less likely to result in zero items and require a fallback.
-LIBRARY_PLACEHOLDER = r''
-BARS_PLACEHOLDER = r''
-RESTAURANTS_PLACEHOLDER = r''
+LIBRARY_PLACEHOLDER = r'<!-- Three Local Library Access Placeholder -->'
+BARS_PLACEHOLDER = r'<!-- Three Local Bars Placeholder -->'
+RESTAURANTS_PLACEHOLDER = r'<!-- Three Local Restaurants Placeholder -->'
 WEATHER_PLACEHOLDER = r'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span>'
 
 # Introduce a placeholder for Barbershops to simplify replacement logic
-BARBERS_PLACEHOLDER = r''
+BARBERS_PLACEHOLDER = r'<!-- Three Local Barbers Placeholder -->'
 
 
 def debug_log(message):
@@ -226,10 +224,15 @@ def get_3_amenities(full_city_name, lat, lon, amenity_type):
     while len(final_amenities) < 3:
         debug_log(f"⚠ Adding fallback item for {amenity_type}")
         
+        # FIX: Ensure fallback names do not contain the amenity type's name 
+        # to prevent conflicts with the placeholder comments (e.g., "Bars" in BARS_PLACEHOLDER)
         fallback_name = f"Great Local {amenity_type.capitalize()}"
-        # FIX: Change 'library' fallback name to avoid conflict with LIBRARY_PLACEHOLDER string.
         if amenity_type == 'library':
             fallback_name = "Great Local Reading Spot"
+        elif amenity_type == 'bar': 
+            fallback_name = "Great Local Drinks Spot" # Corrects the conflict causing the MemoryError
+        elif amenity_type == 'barbers':
+            fallback_name = "Great Local Stylist"
 
         final_amenities.append({
             'name': fallback_name,

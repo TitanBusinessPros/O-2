@@ -1,35 +1,28 @@
-name: Dynamic Hub Deployment
+name: Deploy City Website
 
 on:
-  # This configuration ensures the workflow can ONLY be run manually from the GitHub Actions tab.
   workflow_dispatch:
 
 jobs:
-  update_hub:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
-          # Install BeautifulSoup for HTML parsing
-          pip install beautifulsoup4
+          python -m pip install --upgrade pip
+          pip install PyGithub requests Jinja2
 
-      - name: Run HTML Update Script
-        # Execute the python script that will read new.txt and update Final1.html
-        run: python update_deployment_hub_final.py
-
-      - name: Commit and Push Changes
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          # Check if Final1.html was modified by the script
-          file_pattern: 'Final1.html'
-          # Include the secret name 'new7' in the commit message
-          commit_message: '⚙️ MANUAL: Update deployment hub (new7) for new location defined in new.txt'
-          branch: main
+      - name: Run deployment script
+        env:
+          GH_TOKEN: ${{ secrets.NEW7 }}
+        run: |
+          python new_website_deployer.py

@@ -42,7 +42,8 @@ def geocode_city_fixed(city_name):
         "Los Angeles": {"lat": "34.0522", "lon": "-118.2437", "display_name": "Los Angeles, California, USA"},
         "Miami": {"lat": "25.7617", "lon": "-80.1918", "display_name": "Miami, Florida, USA"},
         "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"},
-        "Broken Bow": {"lat": "41.4050", "lon": "-99.6393", "display_name": "Broken Bow, Nebraska, USA"}
+        "Broken Bow": {"lat": "41.4050", "lon": "-99.6393", "display_name": "Broken Bow, Nebraska, USA"},
+        "Tucson": {"lat": "32.2226", "lon": "-110.9747", "display_name": "Tucson, Arizona, USA"}
     }
     
     if city_name in major_cities:
@@ -113,6 +114,17 @@ def query_overpass_fixed(amenity_type, lat, lon):
     
     return []
 
+def extract_amenity_names(amenity_list, limit=3):
+    """Extract names from amenity data, limited to specified number"""
+    names = []
+    for amenity in amenity_list:
+        if len(names) >= limit:
+            break
+        name = amenity.get('tags', {}).get('name')
+        if name and name.strip():
+            names.append(name.strip())
+    return names
+
 def create_website_content(city_name, location_data, wikipedia_text, amenities):
     """Create website content with all replacements"""
     debug_log("Creating website content...")
@@ -134,10 +146,38 @@ def create_website_content(city_name, location_data, wikipedia_text, amenities):
     content = content.replace('35.4676', lat)
     content = content.replace('-97.5164', lon)
     
-    # Replace Wikipedia section
-    old_wiki_text = "Oklahoma City (OKC) is the capital and largest city of Oklahoma."
-    new_wiki_section = f"{wikipedia_text}"
-    content = content.replace(old_wiki_text, new_wiki_section)
+    # Replace Wikipedia section - look for the entire paragraph
+    old_wiki_paragraph = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
+    
+    new_wiki_section = f"{wikipedia_text}<p><em>Source: Wikipedia</em></p>"
+    content = content.replace(old_wiki_paragraph, new_wiki_section)
+    
+    # Replace amenities - limit to 3 each
+    debug_log("Replacing amenity placeholders...")
+    
+    # Libraries
+    library_names = extract_amenity_names(amenities['libraries'], 3)
+    for i, name in enumerate(library_names, 1):
+        placeholder = f"<!-- LIBRARY_{i} -->"
+        content = content.replace(placeholder, name)
+    
+    # Bars
+    bar_names = extract_amenity_names(amenities['bars'], 3)
+    for i, name in enumerate(bar_names, 1):
+        placeholder = f"<!-- BAR_{i} -->"
+        content = content.replace(placeholder, name)
+    
+    # Restaurants
+    restaurant_names = extract_amenity_names(amenities['restaurants'], 3)
+    for i, name in enumerate(restaurant_names, 1):
+        placeholder = f"<!-- RESTAURANT_{i} -->"
+        content = content.replace(placeholder, name)
+    
+    # Barbers
+    barber_names = extract_amenity_names(amenities['barbers'], 3)
+    for i, name in enumerate(barber_names, 1):
+        placeholder = f"<!-- BARBER_{i} -->"
+        content = content.replace(placeholder, name)
     
     debug_log("✓ Template replacements completed")
     return content
@@ -263,9 +303,11 @@ def main():
     # 7. Deploy to GitHub
     if deploy_to_github(repo_name, content):
         debug_log(f"🎉 {city_name} successfully deployed!")
-        debug_log("💡 If GitHub Pages isn't working, manually enable it at:")
-        debug_log(f"   https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
-        debug_log("   Select 'Deploy from a branch' → 'main' branch → '/' folder → Save")
+        debug_log("💡 If content isn't displaying, check that your index.html has the correct placeholders:")
+        debug_log("   <!-- LIBRARY_1 -->, <!-- LIBRARY_2 -->, <!-- LIBRARY_3 -->")
+        debug_log("   <!-- BAR_1 -->, <!-- BAR_2 -->, <!-- BAR_3 -->") 
+        debug_log("   <!-- RESTAURANT_1 -->, <!-- RESTAURANT_2 -->, <!-- RESTAURANT_3 -->")
+        debug_log("   <!-- BARBER_1 -->, <!-- BARBER_2 -->, <!-- BARBER_3 -->")
     else:
         debug_log("❌ Deployment failed")
 

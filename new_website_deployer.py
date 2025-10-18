@@ -225,13 +225,16 @@ def get_3_amenities(full_city_name, lat, lon, amenity_type):
     return final_amenities
 
 def create_amenity_html(amenities):
-    """Generates the HTML list items for a set of 3 amenities."""
+    """
+    Generates the HTML list items for a set of 3 amenities.
+    FIX: Use simple newline separator to avoid introducing a placeholder into the output string.
+    """
     html_list = []
     for a in amenities:
         html_list.append(
             f"<li>**{a['name']}** | {a['address']} | {a['phone']}</li>"
         )
-    return '\n\t\t\t\t\t\t\t'.join(html_list)
+    return '\n'.join(html_list)
 
 def create_website_content(full_city_name, location_data, wikipedia_text, amenities):
     """Create website content with all replacements."""
@@ -259,20 +262,15 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     new_coord_line = f"Lat: **{lat}** | Long: **{lon}** <span class='osm-citation' style='font-size:0.8em;'>© <a href='https://www.openstreetmap.org/copyright' target='_blank'>OpenStreetMap contributors</a> | OSM Nominatim</span>"
     content = content.replace(old_coord_line, new_coord_line)
     
-    # ------------------ Wikipedia section (Task 7) --- FIX FOR MEMORY ERROR ------------------
-    # The previous regex was unstable. We will now replace the whole block exactly.
-    # The new section includes the text and the citation. We must preserve the "The Titan Software Guild" line.
-    
-    # Find the entire block to be replaced (the wiki text and the line immediately following it)
+    # ------------------ Wikipedia section (Task 7) ------------------
+    # Ensure the old and new blocks are correctly matched.
     old_wiki_with_guild_line = OLD_WIKI_BLOCK + "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
     
-    # Build the new block
     new_wiki_with_guild_line = (
         wikipedia_text + 
         "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
     )
     
-    # Simple, safe string replacement
     content = content.replace(old_wiki_with_guild_line, new_wiki_with_guild_line)
 
     
@@ -280,6 +278,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # Barbershop List (Task 6): Target the specific two <li> items
     barbers_html = create_amenity_html(amenities['barbers'])
+    # The regex must be escaped and handle potential whitespace differences
     barbershop_regex = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
     content = re.sub(barbershop_regex, barbers_html, content, 1, re.DOTALL)
     
@@ -289,7 +288,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     # Bars (Task 4) - Use Placeholder
     content = content.replace(BARS_PLACEHOLDER, create_amenity_html(amenities["bar"]))
 
-    # Restaurants (Task 5) - Use Placeholder (This was the line that failed previously)
+    # Restaurants (Task 5) - Use Placeholder
     content = content.replace(RESTAURANTS_PLACEHOLDER, create_amenity_html(amenities["restaurant"]))
 
 
@@ -305,7 +304,6 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
 
 def enable_github_pages(repo):
     """Enable GitHub Pages on the repository"""
-    # This remains the same as it was not the source of error
     debug_log("Enabling GitHub Pages...")
     try:
         try:
@@ -341,7 +339,6 @@ def enable_github_pages(repo):
 
 def deploy_to_github(repo_name, content):
     """Deploy to GitHub using repo secret"""
-    # This remains the same as it was not the source of error
     debug_log(f"Deploying to GitHub: {repo_name}")
     
     try:

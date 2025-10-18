@@ -268,6 +268,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # ------------------ City Name Replacements (Task 8 & 2) ------------------
     city_display = full_city_name.replace('-', ' ')
+    # Using str.replace for simple strings is fine, but we will ensure robustness for key replacements.
     content = content.replace('Current Local Conditions: Oklahoma City', f'Current Local Conditions: {city_display}')
     content = content.replace('Oklahoma City', city_display) 
     content = content.replace('OKC', city_name) 
@@ -281,15 +282,22 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     content = content.replace(old_coord_line, new_coord_line)
     
     # ------------------ Wikipedia section (Task 7) ------------------
-    old_wiki_with_guild_line = OLD_WIKI_BLOCK + "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+    # Use re.sub with re.DOTALL and re.escape to make the replacement robust against whitespace variations.
     
+    # 1. Define the exact string to be replaced (the pattern)
+    old_wiki_with_guild_line_pattern = OLD_WIKI_BLOCK + "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
+    
+    # 2. Escape any special regex characters in the pattern
+    escaped_pattern = re.escape(old_wiki_with_guild_line_pattern)
+    
+    # 3. Create the replacement string
     new_wiki_with_guild_line = (
         wikipedia_text + 
         "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
     )
     
-    content = content.replace(old_wiki_with_guild_line, new_wiki_with_guild_line)
-
+    # 4. Use re.sub with re.DOTALL to match the pattern across newlines/whitespace variations
+    content = re.sub(escaped_pattern, new_wiki_with_guild_line, content, 1, re.DOTALL)
     
     # ------------------ Amenity Lists (Tasks 3, 4, 5, 6) ------------------
     
@@ -313,8 +321,11 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
 
 
     # ------------------ Weather Placeholder (Problem 2 Fix and Citation) ------------------
+    # Use re.sub to replace the weather placeholder, accounting for potential formatting differences.
+    escaped_weather_placeholder = re.escape(WEATHER_PLACEHOLDER)
     new_weather_content = f'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span><p class="noaa-citation" style="font-size:0.8em;">Source: NOAA</p>'
-    content = content.replace(WEATHER_PLACEHOLDER, new_weather_content)
+
+    content = re.sub(escaped_weather_placeholder, new_weather_content, content, 1, re.DOTALL)
 
 
     debug_log("✓ HTML content generated with all replacements.")

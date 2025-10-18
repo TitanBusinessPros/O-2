@@ -1,6 +1,7 @@
 import requests
 import time
 import os
+import re
 from datetime import datetime
 from github import Github, Auth
 
@@ -18,6 +19,14 @@ def read_city_file():
         debug_log(f"ERROR reading new.txt: {str(e)}")
         return None
 
+def create_safe_repo_name(city_name):
+    """Create repository name without spaces or special characters"""
+    safe_name = re.sub(r'[^a-zA-Z0-9]', '-', city_name)
+    safe_name = re.sub(r'-+', '-', safe_name).strip('-')
+    repo_name = f"The-{safe_name}-Software-Guild"
+    debug_log(f"Safe repository name: {repo_name}")
+    return repo_name
+
 def geocode_city_fixed(city_name):
     """Force correct major city detection"""
     debug_log(f"Geocoding: {city_name}")
@@ -32,7 +41,8 @@ def geocode_city_fixed(city_name):
         "New York": {"lat": "40.7128", "lon": "-74.0060", "display_name": "New York, New York, USA"},
         "Los Angeles": {"lat": "34.0522", "lon": "-118.2437", "display_name": "Los Angeles, California, USA"},
         "Miami": {"lat": "25.7617", "lon": "-80.1918", "display_name": "Miami, Florida, USA"},
-        "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"}
+        "Seattle": {"lat": "47.6062", "lon": "-122.3321", "display_name": "Seattle, Washington, USA"},
+        "Broken Bow": {"lat": "41.4050", "lon": "-99.6393", "display_name": "Broken Bow, Nebraska, USA"}
     }
     
     if city_name in major_cities:
@@ -132,6 +142,42 @@ def create_website_content(city_name, location_data, wikipedia_text, amenities):
     debug_log("✓ Template replacements completed")
     return content
 
+def enable_github_pages(repo):
+    """Enable GitHub Pages on the repository"""
+    debug_log("Enabling GitHub Pages...")
+    try:
+        # First check if Pages is already enabled
+        try:
+            pages_info = repo.get_pages()
+            debug_log(f"✓ GitHub Pages already enabled: {pages_info.url}")
+            return True
+        except:
+            # Enable Pages via API
+            headers = {
+                "Authorization": f"token {os.getenv('GH_TOKEN')}",
+                "Accept": "application/vnd.github.v3+json"
+            }
+            data = {
+                "source": {
+                    "branch": "main",
+                    "path": "/"
+                }
+            }
+            response = requests.post(
+                f"https://api.github.com/repos/TitanBusinessPros/{repo.name}/pages",
+                headers=headers,
+                json=data
+            )
+            if response.status_code in [200, 201]:
+                debug_log("✓ GitHub Pages enabled successfully")
+                return True
+            else:
+                debug_log(f"⚠ Could not auto-enable Pages: {response.status_code}")
+                return False
+    except Exception as e:
+        debug_log(f"⚠ Pages enablement issue: {str(e)}")
+        return False
+
 def deploy_to_github(repo_name, content):
     """Deploy to GitHub using repo secret"""
     debug_log(f"Deploying to GitHub: {repo_name}")
@@ -166,9 +212,13 @@ def deploy_to_github(repo_name, content):
             repo.create_file("index.html", f"Deploy {repo_name}", content)
             debug_log("✓ Created index.html")
         
+        # Enable GitHub Pages
+        enable_github_pages(repo)
+        
         debug_log("✅ DEPLOYMENT SUCCESSFUL!")
         debug_log(f"📁 Repository: https://github.com/TitanBusinessPros/{repo_name}")
-        debug_log(f"🔧 Enable Pages: https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
+        debug_log(f"🌐 Pages URL: https://TitanBusinessPros.github.io/{repo_name}")
+        debug_log(f"🔧 Manual Pages setup: https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
         return True
         
     except Exception as e:
@@ -183,16 +233,19 @@ def main():
     if not city_name:
         return
     
-    # 2. Geocode with fixed coordinates
+    # 2. Create safe repository name (FIXED: No spaces)
+    repo_name = create_safe_repo_name(city_name)
+    
+    # 3. Geocode with fixed coordinates
     location = geocode_city_fixed(city_name)
     if not location:
         debug_log("❌ No location data")
         return
     
-    # 3. Get Wikipedia data
+    # 4. Get Wikipedia data
     wiki_text = get_wikipedia_summary_fixed(city_name)
     
-    # 4. Query amenities with proper delays
+    # 5. Query amenities with proper delays
     amenities = {}
     amenity_types = ['libraries', 'bars', 'restaurants', 'barbers']
     
@@ -202,15 +255,17 @@ def main():
             debug_log("Waiting 5 seconds before next Overpass query...")
             time.sleep(5)
     
-    # 5. Create website content
+    # 6. Create website content
     content = create_website_content(city_name, location, wiki_text, amenities)
     if not content:
         return
     
-    # 6. Deploy to GitHub
-    repo_name = f"The-{city_name}-Software-Guild"
+    # 7. Deploy to GitHub
     if deploy_to_github(repo_name, content):
         debug_log(f"🎉 {city_name} successfully deployed!")
+        debug_log("💡 If GitHub Pages isn't working, manually enable it at:")
+        debug_log(f"   https://github.com/TitanBusinessPros/{repo_name}/settings/pages")
+        debug_log("   Select 'Deploy from a branch' → 'main' branch → '/' folder → Save")
     else:
         debug_log("❌ Deployment failed")
 

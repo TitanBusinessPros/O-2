@@ -11,11 +11,18 @@ OVERPASS_URL = "http://overpass-api.de/api/interpreter"
 # Hardcoded text to target for replacement (Task 7)
 OLD_WIKI_BLOCK = "Oklahoma City (OKC) is the capital and largest city of Oklahoma. It is the 20th most populous city in the United States and serves as the primary gateway to the state. Known for its historical roots in the oil industry and cattle packing, it has modernized into a hub for technology, energy, and corporate sectors. OKC is famous for the Bricktown Entertainment District and being home to the NBA's Thunder team."
 
+# Hardcoded text for Barbershop List (Task 6)
+# FIX: Extract the hardcoded list item string to be replaced.
+OLD_BARBERSHOP_BLOCK = r'<li>**The Gents Place** | 13522 N Pennsylvania Ave, Oklahoma City | (405) 842-8468</li>\s*<li>**ManCave Barbershop** | 5721 N Western Ave, Oklahoma City | (405) 605-4247</li>'
+
 # Placeholder comments assumed to exist in index.html for safe amenity replacement
 LIBRARY_PLACEHOLDER = r''
 BARS_PLACEHOLDER = r''
 RESTAURANTS_PLACEHOLDER = r''
 WEATHER_PLACEHOLDER = r'<span id="local-weather-conditions">No weather data. Updated by daily workflow.</span>'
+
+# FIX: Introduce a placeholder for Barbershops to simplify replacement logic
+BARBERS_PLACEHOLDER = r''
 
 
 def debug_log(message):
@@ -227,10 +234,12 @@ def get_3_amenities(full_city_name, lat, lon, amenity_type):
 def create_amenity_html(amenities):
     """
     Generates the HTML list items for a set of 3 amenities.
-    FIX: Use simple newline separator to avoid introducing a placeholder into the output string.
+    Uses simple newline separator.
     """
     html_list = []
     for a in amenities:
+        # Note: The raw HTML content from index.html might have specific indentation before <li>.
+        # We assume the placeholders are outside of the <ul> tag's content, so simple newlines work best.
         html_list.append(
             f"<li>**{a['name']}** | {a['address']} | {a['phone']}</li>"
         )
@@ -250,6 +259,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # ------------------ City Name Replacements (Task 8 & 2) ------------------
     city_display = full_city_name.replace('-', ' ')
+    # The order of these replacements matters to catch "Oklahoma City" before "OKC"
     content = content.replace('Current Local Conditions: Oklahoma City', f'Current Local Conditions: {city_display}')
     content = content.replace('Oklahoma City', city_display) 
     content = content.replace('OKC', city_name) 
@@ -263,7 +273,6 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     content = content.replace(old_coord_line, new_coord_line)
     
     # ------------------ Wikipedia section (Task 7) ------------------
-    # Ensure the old and new blocks are correctly matched.
     old_wiki_with_guild_line = OLD_WIKI_BLOCK + "\nThe Titan Software Guild is where ordinary people become extraordinary creators. Where dreams transform into apps, games, websites, and intelligent systems that change lives."
     
     new_wiki_with_guild_line = (
@@ -276,11 +285,15 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     
     # ------------------ Amenity Lists (Tasks 3, 4, 5, 6) ------------------
     
-    # Barbershop List (Task 6): Target the specific two <li> items
+    # Barbershop List (Task 6): FIX - Change from re.sub to consistent placeholder replacement.
     barbers_html = create_amenity_html(amenities['barbers'])
-    # The regex must be escaped and handle potential whitespace differences
-    barbershop_regex = r'<li>\*\*The Gents Place\*\* \| 13522 N Pennsylvania Ave, Oklahoma City \| \(405\) 842-8468<\/li>\s*<li>\*\*ManCave Barbershop\*\* \| 5721 N Western Ave, Oklahoma City \| \(405\) 605-4247<\/li>'
-    content = re.sub(barbershop_regex, barbers_html, content, 1, re.DOTALL)
+    
+    # 1. Replace the hardcoded list items with the new placeholder
+    # Use re.DOTALL to handle multiline matching
+    content = re.sub(OLD_BARBERSHOP_BLOCK, BARBERS_PLACEHOLDER, content, 1, re.DOTALL)
+    
+    # 2. Replace the placeholder with the generated HTML
+    content = content.replace(BARBERS_PLACEHOLDER, barbers_html)
     
     # Libraries (Task 3) - Use Placeholder
     content = content.replace(LIBRARY_PLACEHOLDER, create_amenity_html(amenities["library"]))
@@ -288,7 +301,7 @@ def create_website_content(full_city_name, location_data, wikipedia_text, amenit
     # Bars (Task 4) - Use Placeholder
     content = content.replace(BARS_PLACEHOLDER, create_amenity_html(amenities["bar"]))
 
-    # Restaurants (Task 5) - Use Placeholder
+    # Restaurants (Task 5) - Use Placeholder (This line keeps failing due to the previous issue)
     content = content.replace(RESTAURANTS_PLACEHOLDER, create_amenity_html(amenities["restaurant"]))
 
 

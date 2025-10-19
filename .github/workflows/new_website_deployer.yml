@@ -1,39 +1,39 @@
-# .github/workflows/new_website_deployer.yml
+# new_website_deployer.yml
 
-name: Deploy Website with Location Update
+name: Single-Step Website Deployment
 
 on:
   push:
     branches:
-      - main  # Trigger the workflow on pushes to the main branch
+      - main
+  # Allows you to manually trigger the workflow from the Actions tab
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # Step 1: Check out the repository code
-      - name: Checkout Repository
+      - name: 1. Checkout Repository
         uses: actions/checkout@v4
 
-      # Step 2: Setup Python environment for the script
-      - name: Setup Python
+      - name: 2. Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      # Step 3: Run the Python script to replace the City/State
-      - name: Run City/State Replacement Script
+      # This runs your existing Python script to perform the text replacement
+      - name: 3. Run City/State Replacement Script
         run: python new_website_deployer.py
-        # This executes the script, reading new.txt and modifying all HTML files
-
-      # Step 4: Deploy the website using the new secret
-      - name: Deploy to GitHub Pages
-        # The 'peaceiris/actions-gh-pages@v4' is a very common static site deployer.
+        
+      # This deploys the modified files using your new token
+      - name: 4. Deploy to GitHub Pages using NEW7
         uses: peaceiris/actions-gh-pages@v4 
         with:
-          # --- KEY UPDATE: Using the new secret name 'NEW7' ---
-          # This assumes 'NEW7' is a Personal Access Token (PAT) 
-          # with 'repo' scope, stored in your repository secrets.
+          # Your specified Secret
           github_token: ${{ secrets.NEW7 }} 
-          # ---------------------------------------------------
-          publish_dir: . # Change this if your build artifacts are in a sub-folder (e.g., 'build')
+          # The source folder for deployment (the root of your repo)
+          publish_dir: . 
+          # The target branch for GitHub Pages
+          publish_branch: gh-pages
+          # This ensures the 'gh-pages' branch is created cleanly if missing
+          force_orphan: true

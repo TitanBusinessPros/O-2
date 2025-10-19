@@ -1,28 +1,39 @@
-name: Deploy City Website
+# .github/workflows/new_website_deployer.yml
+
+name: Deploy Website with Location Update
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main  # Trigger the workflow on pushes to the main branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
+      # Step 1: Check out the repository code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # Step 2: Setup Python environment for the script
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.x'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install PyGithub requests Jinja2
+      # Step 3: Run the Python script to replace the City/State
+      - name: Run City/State Replacement Script
+        run: python new_website_deployer.py
+        # This executes the script, reading new.txt and modifying all HTML files
 
-      - name: Run deployment script
-        env:
-          GH_TOKEN: ${{ secrets.NEW7 }}
-        run: |
-          python new_website_deployer.py
+      # Step 4: Deploy the website using the new secret
+      - name: Deploy to GitHub Pages
+        # The 'peaceiris/actions-gh-pages@v4' is a very common static site deployer.
+        uses: peaceiris/actions-gh-pages@v4 
+        with:
+          # --- KEY UPDATE: Using the new secret name 'NEW7' ---
+          # This assumes 'NEW7' is a Personal Access Token (PAT) 
+          # with 'repo' scope, stored in your repository secrets.
+          github_token: ${{ secrets.NEW7 }} 
+          # ---------------------------------------------------
+          publish_dir: . # Change this if your build artifacts are in a sub-folder (e.g., 'build')

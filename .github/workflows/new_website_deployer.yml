@@ -1,28 +1,26 @@
-name: Dynamic City Website Builder (Manual Only)
+name: Dynamic City Repo Creator (Final Manual Workflow)
 
 on:
-  # 🛑 Only manual triggering is allowed.
+  # 🛑 This is the ONLY trigger. The workflow will ONLY run when manually selected.
   workflow_dispatch: 
 
 permissions:
-  # Minimal permissions for the runner; the secrets.NEW7 token handles the heavy lifting
+  # Minimal permissions for the runner. The secrets.NEW7 token handles the heavy lifting.
   contents: none
   pages: none    
   id-token: none 
 
 jobs:
   # ----------------------------------------------------------------
-  # JOB 1: BUILD & DEPLOY TO DYNAMIC REPOS ONLY
-  # This job executes the script responsible for creating new repos and nothing else.
+  # JOB 1: EXECUTE SCRIPT AND PUSH NEW REPO
   # ----------------------------------------------------------------
   dynamic_repo_creator:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository (Full History)
+      - name: Checkout Source Repository
         uses: actions/checkout@v4
         with:
-          # IMPORTANT: Use the NEW7 PAT token for all Git operations to enable 
-          # creation and pushing to new, city-named repositories.
+          # CRITICAL: Use the NEW7 PAT token to grant cross-repository permissions
           token: ${{ secrets.NEW7 }} 
           fetch-depth: 0 
 
@@ -36,9 +34,8 @@ jobs:
           pip install requests
 
       - name: Execute Python Script (Creates and Pushes New Repos)
-        # This script ('new_website_deployer.py') must be entirely responsible 
-        # for reading new.txt, updating index.html, and creating/pushing 
-        # the new city-specific repository.
+        # This executes your script which is responsible for API/Git commands
+        # to create a new GitHub repo based on the name in new.txt.
         run: python new_website_deployer.py
 
-# 🛑 NO SECOND JOB. NO 'pages: write' PERMISSION. NO deployment of the current O-2 repo.
+# 🛑 END OF WORKFLOW. No further steps are needed.

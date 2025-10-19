@@ -1,40 +1,81 @@
-name: Final Working GitHub Pages Deploy
+name: Automated Weather Update & Pages Deployment
 
 on:
+  # Triggers the workflow once a day at 12:00 AM UTC
+  schedule:
+    - cron: '0 0 * * *' 
+  # Allows manual triggering from the Actions tab
+  workflow_dispatch:
+  # Runs when code is pushed to the main branch
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - main 
+
+permissions:
+  # Required to commit the updated HTML file back to the repo
+  contents: write 
+  # Required to deploy to GitHub Pages
+  pages: write    
+  # Required for OIDC authentication by deploy-pages action
+  id-token: write 
 
 jobs:
-  build:
+  # ----------------------------------------------------------------
+  # JOB 1: BUILD, UPDATE, AND COMMIT
+  # This job runs the Python script and commits the changes.
+  # ----------------------------------------------------------------
+  build_and_commit:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout Repository
+      - name: Checkout Repository (Full History)
         uses: actions/checkout@v4
-      - name: 2. Setup Python
+        with:
+          # Critical: Fetches full history required by the commit action
+          fetch-depth: 0 
+
+      - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: 3. Run City/State Replacement Script
-        run: python new_website_deployer.py
-      - name: 4. Upload Deployment Artifact
+
+      - name: Install Python Dependencies
+        # Installs the common 'requests' library for API calls
+        run: |
+          pip install requests
+
+      - name: Execute Python Script (Updates HTML File)
+        # Assuming your script is named 'new_website_deployer.py'
+        run: python new_website_deployer.py 
+
+      - name: Commit and Push Updated HTML File
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: '🤖 Automated weather data refresh: index.html'
+          # CRITICAL: Specify the EXACT HTML file name you want to commit
+          files: 'index.html' 
+          branch: ${{ github.ref_name }}
+
+      - name: Setup Pages Environment
+        uses: actions/configure-pages@v5
+
+      - name: Upload Deployment Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          # Uploads the entire contents of the current folder, including the updated HTML file
+          path: './' 
 
+  # ----------------------------------------------------------------
+  # JOB 2: DEPLOY
+  # This job takes the artifact and makes the site live.
+  # ----------------------------------------------------------------
   deploy:
-    # --- THIS BLOCK IS REQUIRED TO FIX THE ERROR ---
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    # -----------------------------------------------
     runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      pages: write
-      id-token: write
+    # Ensures this job only starts after the previous one successfully committed the files
+    needs: build_and_commit 
     steps:
-      - name: 5. Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

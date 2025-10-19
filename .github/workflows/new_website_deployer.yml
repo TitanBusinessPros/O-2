@@ -1,11 +1,11 @@
 name: Dynamic City Website Deployment (Manual Only)
 
 on:
-  # Allows the workflow to be manually triggered from the GitHub Actions tab.
+  # 🛑 Only manual triggering is enabled now.
   workflow_dispatch: 
 
 permissions:
-  # Default minimal permissions for security
+  # Necessary permissions are retained
   contents: read
   pages: write    
   id-token: write 
@@ -13,7 +13,6 @@ permissions:
 jobs:
   # ----------------------------------------------------------------
   # JOB 1: BUILD & DEPLOY TO DYNAMIC REPOS
-  # This job runs the Python script and handles all repository creation/pushes.
   # ----------------------------------------------------------------
   dynamic_deploy:
     runs-on: ubuntu-latest
@@ -21,7 +20,7 @@ jobs:
       - name: Checkout Repository (Full History)
         uses: actions/checkout@v4
         with:
-          # Use the NEW7 PAT for cloning/pushing across repos, enabling creation of new city repos
+          # Use the NEW7 PAT for cloning/pushing across repos
           token: ${{ secrets.NEW7 }} 
           fetch-depth: 0 
 
@@ -35,12 +34,10 @@ jobs:
           pip install requests
 
       - name: Execute Python Script (Handles Dynamic Repo Creation/Push)
-        # Your script, 'new_website_deployer.py', must contain the logic 
-        # to create and push the new city-specific GitHub Pages repository.
+        # Your script runs the logic here, including the cross-repo pushes.
         run: python new_website_deployer.py
 
       # --- Deployment for the current 'O-2' repo (Standard GitHub Pages) ---
-      # This part ensures the *current* repository is also updated and deployed.
       
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -48,17 +45,14 @@ jobs:
       - name: Upload Current Artifact (index.html, new.txt, etc.)
         uses: actions/upload-pages-artifact@v3
         with:
-          # Uploads all files required for the current O-2 Pages site
           path: './' 
 
   # ----------------------------------------------------------------
   # JOB 2: DEPLOY (Standard O-2 Repo Pages Deployment)
-  # This makes the current O-2 URL live with the latest changes.
   # ----------------------------------------------------------------
   deploy_o2_pages:
     environment:
       name: github-pages
-      # This URL is fixed to the O-2 repo: https://titanbusinesspros.github.io/O-2/
       url: ${{ steps.deployment.outputs.page_url }} 
     runs-on: ubuntu-latest
     needs: dynamic_deploy 

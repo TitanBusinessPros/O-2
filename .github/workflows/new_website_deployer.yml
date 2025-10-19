@@ -1,15 +1,12 @@
 name: Dynamic City Repo Creator (Manual-Only Guarantee)
 
 on:
-  # 🛑 Manual trigger is the primary (and intended only) way to run.
+  # 🛑 CRITICAL FIX: Only the manual trigger is listed. 
+  # This guarantees no other event (like push or schedule) can start the workflow.
   workflow_dispatch: 
-  
-  # 🛑 CRITICAL FIX: This line explicitly ignores all push events, 
-  # preventing the automatic running loop caused by your script's 'git push' command.
-  push: []
 
 permissions:
-  # The runner requires no direct permissions, as the secrets.NEW7 token handles the heavy lifting
+  # Minimal permissions for the runner.
   contents: none
   pages: none    
   id-token: none 
@@ -38,5 +35,4 @@ jobs:
           pip install requests
 
       - name: Execute Python Script (Creates and Pushes New Repos)
-        # This runs your script, which must contain the logic to create and push the new repo.
         run: python new_website_deployer.py

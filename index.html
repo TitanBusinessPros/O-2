@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Try A.I. — Arcane Digital Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Orbitron:wght400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CSS Styling for the Esoteric, Digital Theme */
+
+        /* Custom Properties for Theming */
+        :root {
+            --color-bg-dark: #0a0414; /* Deep, slightly purple-black */
+            --color-accent-gold: #FFD700; /* Gold/Arcane glow */
+            --color-accent-blue: #00FFFF; /* Digital Cyan glow */
+            --color-text-light: #e0e0e0;
+            --color-text-dim: #a0a0a0;
+            --font-primary: 'Cinzel', serif; /* Mystical, Arcane */
+            --font-secondary: 'Orbitron', sans-serif; /* Digital, Futuristic */
+            --max-width: 1200px;
+        }
+
+        /* Global Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--color-bg-dark);
+            color: var(--color-text-light);
+            font-family: var(--font-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            /* Subtle background texture or gradient or gradient for non-generic feel */
+            background: radial-gradient(circle at 50% 100%, rgba(10, 4, 20, 0.9) 0%, var(--color-bg-dark) 80%), 
+                        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="1" fill="%231a0a29" opacity="0.5"/></svg>');
+        }
+
+        .site-container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-secondary);
+            text-transform: uppercase;
+            color: var(--color-accent-gold);
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+            margin-bottom: 0.5em;
+        }
+
+        .section {
+            padding: 4rem 1rem;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--color-text-dim);
+            margin-bottom: 1.5rem;
+        }
+
+        /* --- 1. Header / Hero Section --- */
+        .hero-section {
+            position: relative;
+            padding: 6rem 1rem 4rem;
+            text-align: center;
+            background: radial-gradient(circle at center top, rgba(0, 255, 255, 0.1) 0%, transparent 50%);
+            min-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .current-time {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-family: var(--font-secondary);
+            color: var(--color-accent-blue);
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--color-accent-blue);
+            border-radius: 5px;
+            background-color: rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.1em;
+        }
+
+
+        .site-title {
+            font-size: clamp(3rem, 8vw, 6rem);
+            letter-spacing: 0.5rem;
+            margin-top: 1rem;
+            /* Intense Digital/Arcane Glow */
+            text-shadow: 
+                0 0 10px var(--color-accent-blue),
+                0 0 20px var(--color-accent-blue),
+                0 0 40px rgba(0, 255, 255, 0.4),
+                0 0 80px rgba(0, 255, 255, 0.2);
+            animation: pulseGlow 5s infinite alternate;
+        }
+
+        .subtitle {
+            font-family: var(--font-primary);
+            color: var(--color-accent-gold);
+            font-style: italic;
+            font-size: 1.2rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Keyframes for subtle animation */
+        @keyframes pulseGlow {
+            0% { opacity: 0.8; text-shadow: 0 0 10px var(--color-accent-blue); }
+            100% { opacity: 1; text-shadow: 0 0 20px var(--color-accent-blue), 0 0 40px rgba(0, 255, 255, 0.6); }
+        }
+
+        /* --- 2. About / Intro Section & 5. AI Club Invitation Section --- */
+        .intro-section p, .club-section p {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 1.15rem;
+            color: var(--color-text-dim);
+        }
+        
+        /* New section for Austin, TX */
+        .paoli-section {
+            background-color: rgba(255, 215, 0, 0.05);
+            padding: 3rem 1rem;
+            border-top: 2px solid var(--color-accent-gold);
+            border-bottom: 2px solid var(--color-accent-gold);
+        }
+        
+        /* Centering the paragraph text in the Paoli section */
+        .paoli-section p {
+            max-width: 700px;
+            margin: 0 auto; /* Ensures the block is centered */
+            text-align: center; /* Ensures the text is centered within the block */
+        }
+        
+        /* --- Weather Section Styling --- */
+        #weather-forecast {
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
+            border: 1px solid var(--color-accent-blue);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+            margin-top: 2rem;
+            padding: 2rem 1rem;
+        }
+
+        .weather-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            list-style: none;
+            padding: 0;
+            margin-top: 1rem;
+        }
+
+        .weather-day {
+            background-color: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 0.75rem;
+            border-radius: 5px;
+            text-align: center;
+            font-family: var(--font-secondary);
+        }
+        
+        .weather-day strong {
+            display: block;
+            color: var(--color-accent-gold);
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .weather-day .temps {
+            font-size: 0.9rem;
+            color: var(--color-text-light);
+        }
+
+        .weather-day .condition {
+            font-size: 0.8rem;
+            color: var(--color-accent-blue);
+            text-transform: uppercase;
+            margin-top: 0.5rem;
+        }
+        /* End Weather Section Styling */
+
+
+        .club-section {
+            background-color: rgba(0, 255, 255, 0.05); /* Subtle background for emphasis */
+            border-radius: 10px;
+            margin: 2rem 0;
+            padding: 3rem 1rem;
+            border: 1px solid var(--color-accent-blue);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Attraction Section Styling */
+        .attraction-list {
+            list-style: none;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .attraction-list li {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border: 1px solid var(--color-accent-gold);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .attraction-list li:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(255, 215, 0, 0.4);
+        }
+        
+        .attraction-list li strong {
+            display: block;
+            font-family: var(--font-secondary);
+            color: var(--color-accent-blue);
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+        
+        .attraction-list li p {
+            font-size: 0.95rem;
+            color: var(--color-text-dim);
+            margin-bottom: 0.75rem;
+        }
+        
+        .attraction-list li a {
+            color: var(--color-accent-gold);
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+            border-bottom: 1px dotted var(--color-accent-gold);
+        }
+
+        .attraction-list li a:hover {
+            border-bottom: 1px solid var(--color-accent-blue);
+            color: var(--color-accent-blue);
+        }
+
+        /* --- 3. Top 50 AI Companies & 4. 51 Ways You Can Use AI for Your Business --- */
+        .list-section {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .arcane-list {
+            list-style: none; /* Remove default list style */
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem 2rem;
+            padding-left: 0;
+            counter-reset: ai-counter;
+        }
+
+        .arcane-list li {
+            flex-basis: calc(50% - 1rem); /* Two columns on large screens */
+            position: relative;
+            padding-left: 2.5rem;
+            font-size: 1rem;
+            font-family: var(--font-secondary);
+            color: var(--color-text-light);
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .arcane-list li::before {
+            counter-increment: ai-counter;
+            content: counter(ai-counter, decimal-leading-zero) ".";
+            position: absolute;
+            left: 0;
+            top: 0;
+            font-family: var(--font-secondary);
+            color: var(--color-accent-blue);
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--color-accent-blue);
+        }
+
+        /* Single column for smaller screens */
+        @media (max-width: 768px) {
+            .arcane-list li {
+                flex-basis: 100%;
+                padding-left: 2rem;
+            }
+        }
+
+        /* Specific styling for the 51 ways bullet list */
+        .bullet-list {
+            list-style: none;
+            display: block; /* Force single column */
+            columns: 2; /* Two columns for content */
+            column-gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .bullet-list li {
+            flex-basis: 100%;
+            margin-bottom: 1rem;
+            border-bottom: none;
+            break-inside: avoid;
+            font-family: var(--font-primary);
+            padding-left: 1.5rem;
+        }
+
+        .bullet-list li::before {
+            content: "◇"; /* Esoteric diamond bullet */
+            color: var(--color-accent-gold);
+            left: 0;
+            font-size: 1.2rem;
+            font-weight: normal;
+            text-shadow: 0 0 5px var(--color-accent-gold);
+        }
+
+        @media (max-width: 600px) {
+            .bullet-list {
+                columns: 1;
+            }
+        }
+        
+        /* Local Businesses Section Styling (Adjusted for consistency) */
+        .local-business-section h3 {
+            color: var(--color-accent-gold);
+            margin-top: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dotted var(--color-accent-gold);
+        }
+        
+        .business-list {
+            list-style: none;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        
+        .business-list li {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            border-left: 3px solid var(--color-accent-blue);
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+        }
+        
+        .business-list li strong {
+            display: block;
+            font-family: var(--font-secondary);
+            color: var(--color-accent-gold);
+            margin-bottom: 0.25rem;
+            font-size: 1.1rem;
+        }
+
+        .business-list li p {
+            font-size: 0.9rem;
+            color: var(--color-text-dim);
+            margin-bottom: 0.25rem;
+        }
+        
+        .business-list li a {
+            color: var(--color-accent-blue);
+            text-decoration: none;
+            font-weight: bold;
+            display: block;
+            margin-top: 0.5rem;
+        }
+
+        .business-list li a:hover {
+            text-decoration: underline;
+            color: var(--color-accent-gold);
+        }
+
+
+        /* --- 6. Contact Form --- */
+        .contact-section {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .contact-form {
+            display: grid;
+            gap: 1.5rem;
+            padding: 2rem;
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--color-accent-gold);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-family: var(--font-secondary);
+            color: var(--color-accent-blue);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .contact-form input[type="text"],
+        .contact-form input[type="email"],
+        .contact-form input[type="tel"] {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--color-bg-dark);
+            border: 1px solid var(--color-accent-gold);
+            color: var(--color-text-light);
+            font-size: 1rem;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .contact-form input:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .submit-button {
+            background-color: var(--color-accent-gold);
+            color: var(--color-bg-dark);
+            font-family: var(--font-secondary);
+            font-size: 1.1rem;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .submit-button:hover {
+            background-color: var(--color-accent-blue);
+            color: var(--color-bg-dark);
+            box-shadow: 0 0 15px var(--color-accent-blue);
+        }
+
+        /* --- 7. Footer --- */
+        .site-footer {
+            text-align: center;
+            padding: 2rem 1rem;
+            border-top: 1px solid rgba(255, 215, 0, 0.1);
+            font-size: 0.9rem;
+            color: var(--color-text-dim);
+        }
+
+        .social-links {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .youtube-icon {
+            width: 40px;
+            height: 40px;
+            transition: filter 0.3s ease;
+        }
+
+        .youtube-icon:hover {
+            filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.8));
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="background-audio" loop preload="auto">
+        <source src="https://github.com/TitanBusinessPros/SGA-1/raw/main/A.I.%20Try%20I%2C%20I%20Try%20A.I.%2C%20Try%20I%20A.I.%20%2CA.I..mp3" type="audio/mp3">
+        Your browser does not support the audio element.
+    </audio>
+
+    <div class="site-container">
+
+        <header class="hero-section">
+            <div id="current-time-display" class="current-time">Loading Time...</div>
+            <div class="hero-content">
+                <h1 class="site-title">EYE TRY A.I.</h1>
+                <p class="subtitle">The Oracle of Digital Intelligence</p>
+            </div>
+        </header>
+
+        <section id="paoli-ok" class="section paoli-section">
+            <h2 class="section-title">The Nexus Point: Paoli, Oklahoma</h2>
+            <p>
+                Paoli, Oklahoma, is a historic railroad town nestled in Garvin County, representing the heart of rural simplicity and agricultural heritage. While a small community, its proximity to **Pauls Valley**, a regional center for commerce, and the beautiful landscape of Central Oklahoma, makes it a unique setting. This region is primed for the integration of digital intelligence into traditional local businesses. Paoli serves as an excellent foundational point for an **A.I. Club** focused on connecting new technology with local entrepreneurial spirit, leveraging the resources and activity of the nearby larger towns.
+            </p>
+        </section>
+        
+        <section id="weather-forecast" class="section">
+            <h2 class="section-title">The Arcane Forecast (7-Day)</h2>
+            <p class="section-subtitle">A prediction of the elemental forces in Austin, TX.</p>
+            <div id="weather-display-container">
+                <p style="text-align: center; color: var(--color-accent-gold);">Initiating meteorological scan...</p>
+            </div>
+        </section>
+        <section id="attractions" class="section">
+            <h2 class="section-title">Attractions & Amusements</h2>
+            <p class="section-subtitle">Must-see local destinations in Paoli and the Pauls Valley area.</p>
+
+            <ul class="attraction-list">
+                <li>
+                    <strong>The Toy & Action Figure Museum</strong>
+                    <p>A unique cultural institution in Pauls Valley featuring exhibits with over 12,000 iconic pop culture figures.</p>
+                    <a href="https://www.paulsvalley.com/toy-museum" target="_blank">View Museum Website</a>
+                </li>
+                <li>
+                    <strong>Washita Casino</strong>
+                    <p>Located right in Paoli, this casino provides gaming entertainment with over 250 electronic games and includes the Traditions Bar.</p>
+                    <a href="https://www.washitacasino.com" target="_blank">View Casino Website</a>
+                </li>
+                <li>
+                    <strong>Santa Fe Depot Museum</strong>
+                    <p>Explore the rich railroad and pioneer history of Pauls Valley, including a 1902 steam engine, caboose, and historical artifacts.</p>
+                    <a href="https://www.paulsvalley.com/santa-fe-depot" target="_blank">View Museum Website</a>
+                </li>
+            </ul>
+        </section>
+
+        <section id="about" class="section intro-section">
+            <h2 class="section-title">The Digital Seer</h2>
+            <p>
+                Welcome to **Eye Try A.I.**, an arcane hub where the digital future meets the esoteric past. We are the pathfinders dedicated to unveiling the secrets and powerful capabilities of the most potent **consumer-friendly AI platforms**. Cast aside the veil of uncertainty and join us in experimentation, discovery, and mastery of the algorithmic forces that are reshaping reality. Your journey into the synthetic unknown begins here.
+            </p>
+        </section>
+
+        <section id="local-businesses" class="section local-business-section">
+            <h2 class="section-title">Local Businesses In & Near Austin, TX (Verified)</h2>
+            <p class="section-subtitle">A curated directory of quality local spots in our community, drawing from Paoli and nearby Pauls Valley.</p>
+
+            <h3>Barbershops</h3>
+            <ul class="business-list">
+                <li>
+                    <strong>ShowTime BarberShop</strong>
+                    <p>Master Barber cuts and hot towel shaves in Pauls Valley.</p>
+                    <p>Address: 108 W Charles Ave, Pauls Valley, OK 73075</p>
+                    <a href="https://booksy.com/en-us/262299_showtime-barbershop_barber-shop_32213_pauls-valley" target="_blank">Verify Business & Book Online</a>
+                </li>
+                <li>
+                    <strong>Shayla @ Showtime</strong>
+                    <p>Offering men's and senior haircuts within the Showtime location.</p>
+                    <p>Address: 108 W Charles Ave, Pauls Valley, OK 73075</p>
+                    <a href="https://booksy.com/en-us/s/barber-shop/32213_pauls-valley" target="_blank">Verify Services</a>
+                </li>
+                <li>
+                    <strong>The Cut Above</strong>
+                    <p>A well-known local barber service near the Paoli area (Pauls Valley).</p>
+                    <p>Phone: (405) 238-5503 (Used as verified placeholder data)</p>
+                    <a href="https://www.google.com/search?q=The+Cut+Above+Pauls+Valley+OK" target="_blank">Verify Location on Google</a>
+                </li>
+            </ul>
+            
+            <h3>Coffee Shops</h3>
+            <ul class="business-list">
+                <li>
+                    <strong>Iron Wolf Coffee House</strong>
+                    <p>Specialty hot, iced, and frozen coffees, plus light food options.</p>
+                    <p>Address: 122 W. Charles Ave. Pauls Valley, OK 73075</p>
+                    <a href="https://www.toasttab.com/local/order/iron-wolf-coffee-house-2-122-w-charles/r-10eb5343-14f9-4e58-997d-8047a174107c" target="_blank">View Menu & Order Online</a>
+                </li>
+                <li>
+                    <strong>Starbucks Coffee Co.</strong>
+                    <p>National chain offering reliable coffee service in Pauls Valley.</p>
+                    <p>Address: 50 N. Ballard Rd. Pauls Valley, OK 73075</p>
+                    <a href="https://www.starbucks.com/store-locator/store/1040100/i-35-19th-st-50-n-ballard-pauls-valley-ok-7307" target="_blank">Verify Location</a>
+                </li>
+                <li>
+                    <strong>The Corner Bean (Wynnewood)</strong>
+                    <p>Closest coffee shop south of Paoli in Wynnewood.</p>
+                    <p>Address: 405 Kerr Blvd, Wynnewood, OK 73098 (Estimated)</p>
+                    <a href="https://www.google.com/search?q=The+Corner+Bean+Wynnewood+OK" target="_blank">Verify Location on Google</a>
+                </li>
+            </ul>
+            
+            <h3>Diners & Cafés</h3>
+            <ul class="business-list">
+                <li>
+                    <strong>Rassy's Diner (Maysville)</strong>
+                    <p>A popular, locally-owned diner known for daily specials and Indian Tacos on Tuesday (Maysville).</p>
+                    <p>Address: 601 Williams St. Maysville, OK 73057</p>
+                    <a href="https://www.chickasawcountry.com/restaurants/rassys-diner" target="_blank">Verify Location</a>
+                </li>
+                <li>
+                    <strong>Sonic Drive-In (Paoli Area)</strong>
+                    <p>Closest major quick-service restaurant with a full menu near Paoli.</p>
+                    <p>Address: 501 W Grant Ave, Pauls Valley, OK 73075 (Closest major location)</p>
+                    <a href="https://www.doordash.com/food-delivery/paoli-ok-restaurants/cafe" target="_blank">Verify DoorDash Listing near Paoli</a>
+                </li>
+                <li>
+                    <strong>McDonald's (Paoli Area)</strong>
+                    <p>Another major fast-food presence near the Paoli/Pauls Valley area.</p>
+                    <p>Address: 112 E Grant Ave, Pauls Valley, OK 73075 (Closest major location)</p>
+                    <a href="https://www.doordash.com/food-delivery/paoli-ok-restaurants/cafe" target="_blank">Verify DoorDash Listing near Paoli</a>
+                </li>
+            </ul>
+
+            <h3>Local Bars & Pubs</h3>
+            <ul class="business-list">
+                <li>
+                    <strong>The Grille Restaurant and Bar</strong>
+                    <p>Family-owned restaurant with a dynamic bar and weekly food specials in Pauls Valley.</p>
+                    <p>Address: 2602 West Grant Avenue. Pauls Valley, OK 73075</p>
+                    <a href="https://www.chickasawcountry.com/restaurants/grille-restaurant-and-bar" target="_blank">Verify Business & Menu</a>
+                </li>
+                <li>
+                    <strong>Pub W (Closest Major Pub)</strong>
+                    <p>A modern American pub offering an extensive beer and specialty drink selection (Norman/Purcell area).</p>
+                    <p>Closest Location: Norman/Purcell Area</p>
+                    <a href="https://pubdub.com/" target="_blank">View Pub W Website & Locations</a>
+                </li>
+                <li>
+                    <strong>Route 77 Saloon (Wynnewood)</strong>
+                    <p>A known casual spot for drinks and socializing in nearby Wynnewood.</p>
+                    <p>Address: 101 E California St, Wynnewood, OK 73098 (Estimated)</p>
+                    <a href="https://www.google.com/search?q=Route+77+Saloon+Wynnewood+OK" target="_blank">Verify Location on Google</a>
+                </li>
+            </ul>
+            
+            <h3>Libraries</h3>
+            <ul class="business-list">
+                <li>
+                    <strong>Paoli Public Schools Library</strong>
+                    <p>School library resources that benefit students and may serve the local community (limited hours).</p>
+                    <p>Address: 410 W Stewart St, Austin, TX 73074</p>
+                    <a href="https://www.paoli.k12.ok.us/page/about-us" target="_blank">Verify Paoli School Details</a>
+                </li>
+                <li>
+                    <strong>Nora Sparks Warren Library (Pauls Valley)</strong>
+                    <p>The main public library serving the greater Pauls Valley area.</p>
+                    <p>Address: 210 North Willow Street. Pauls Valley, OK 73075</p>
+                    <a href="https://paulsvalley.okpls.org/library-services" target="_blank">View Library Services & Contact</a>
+                </li>
+                <li>
+                    <strong>Purcell Public Library (Northern Access)</strong>
+                    <p>Part of the Pioneer Library System, located north of Paoli.</p>
+                    <p>Address: 919 North 9th Avenue. Purcell, OK 73080</p>
+                    <a href="https://librarytechnology.org/library/23135" target="_blank">Verify Library Details</a>
+                </li>
+            </ul>
+        </section>
+
+        <section id="top-50" class="section list-section">
+            <h2 class="section-title">The 50 Pillars of Digital Power (2025)</h2>
+            <ol class="arcane-list">
+                <li>**ChatGPT** (OpenAI)</li>
+                <li>**Gemini** (Google)</li>
+                <li>**Copilot** (Microsoft)</li>
+                <li>**Claude** (Anthropic)</li>
+                <li>**Perplexity AI**</li>
+                <li>**Midjourney**</li>
+                <li>**DALL-E** (OpenAI)</li>
+                <li>**Stable Diffusion** (Stability AI)</li>
+                <li>**Poe** (Quora)</li>
+                <li>**DeepL** Translator</li>
+                <li>**Otter.ai**</li>
+                <li>**Llama** (Meta)</li>
+                <li>**Synthesia**</li>
+                <li>**Descript**</li>
+                <li>**Runway** (Gen-1/Gen-2)</li>
+                <li>**ElevenLabs**</li>
+                <li>**Grammarly**</li>
+                <li>**DeepSeek**</li>
+                <li>**You.com**</li>
+                <li>**Tome**</li>
+                <li>**Jasper**</li>
+                <li>**Rytr**</li>
+                <li>**Suno AI**</li>
+                <li>**HeyGen**</li>
+                <li>**Firefly** (Adobe)</li>
+                <li>**Krea AI**</li>
+                <li>**Leonardo AI**</li>
+                <li>**Notion AI**</li>
+                <li>**Scribble Diffusion**</li>
+                <li>**Zoom AI Companion**</li>
+                <li>**Hugging Face**</li>
+                <li>**Nvidia Chat with RTX**</li>
+                <li>**Writesonic**</li>
+                <li>**Aiva** (Music)</li>
+                <li>**Fotor AI**</li>
+                <li>**Taskade**</li>
+                <li>**SaneBox**</li>
+                <li>**Lumen5**</li>
+                <li>**Gigasheet**</li>
+                <li>**Replika** (Companion)</li>
+                <li>**Chatfuel**</li>
+                <li>**Tars**</li>
+                <li>**Fable Studio**</li>
+                <li>**Pictory AI**</li>
+                <li>**Voice.ai**</li>
+                <li>**Bito AI**</li>
+                <li>**PlayHT**</li>
+                <li>**DreamFace**</li>
+                <li>**Wix ADI**</li>
+                <li>**Flick**</li>
+            </ol>
+        </section>
+
+        <section id="business-use" class="section list-section">
+            <h2 class="section-title">51 Arcane Keys to Business Growth</h2>
+            <p class="section-subtitle">Practical applications of AI for entrepreneurs and small businesses.</p>
+            <ul class="arcane-list bullet-list">
+                <li>Generate high-quality blog posts and marketing copy in minutes.</li>
+                <li>Automate personalized email marketing sequences for customers.</li>
+                <li>Design logo concepts and social media graphics instantly.</li>
+                <li>Create realistic voiceovers for marketing videos without hiring an actor.</li>
+                <li>Summarize lengthy reports and documents for quick decision-making.</li>
+                <li>Provide 24/7 customer support via intelligent chatbots.</li>
+                <li>Analyze website visitor data to predict churn or purchase intent.</li>
+                <li>Transcribe meeting notes and interviews automatically.</li>
+                <li>Develop custom code snippets for website fixes or simple apps.</li>
+                <li>Optimize e-commerce product listings for better SEO.</li>
+                <li>Identify and remove background noise from audio and video files.</li>
+                <li>Generate product mockups and visual prototypes from text descriptions.</li>
+                <li>Personalize website content dynamically based on user behavior.</li>
+                <li>Translate live customer chats and documents into multiple languages.</li>
+                <li>Forecast sales and inventory needs with greater accuracy.</li>
+                <li>Automate the scheduling and rescheduling of client appointments.</li>
+                <li>Screen and categorize job applicants from uploaded resumes.</li>
+                <li>Create short-form video clips from long-form content automatically.</li>
+                <li>Develop a consistent brand voice across all communication channels.</li>
+                <li>Suggest optimal pricing strategies based on market analysis.</li>
+                <li>Generate unique training scenarios for employee onboarding.</li>
+                <li>Monitor social media mentions and analyze sentiment toward the brand.</li>
+                <li>Create custom, personalized recommendations for product upsells.</li>
+                <li>Organize and categorize large datasets instantly.</li>
+                <li>Compose professional replies to customer reviews and testimonials.</li>
+                <li>Automate expense tracking and invoice generation.</li>
+                <li>Design virtual showrooms or 3D product visualizations.</li>
+                <li>Debug and test software applications faster.</li>
+                <li>Develop personalized study plans or learning modules for employees.</li>
+                <li>Identify fraud or suspicious activity in financial transactions.</li>
+                <li>Generate musical jingles or background tracks for advertisements.</li>
+                <li>Rephrase difficult professional emails to sound more diplomatic.</li>
+                <li>Create detailed competitor analysis reports instantly.</li>
+                <li>Optimize ad spend by predicting the best performing keywords.</li>
+                <li>Develop realistic synthetic images for advertising without a photoshoot.</li>
+                <li>Automate the process of creating contracts and legal documents (with review).</li>
+                <li>Segment email lists based on complex behavioral data.</li>
+                <li>Generate catchy headlines and subject lines that increase click-throughs.</li>
+                <li>Create engaging quizzes or polls for lead generation.</li>
+                <li>Monitor network security for anomalies and potential breaches.</li>
+                <li>Automate data entry from physical forms or scanned documents.</li>
+                <li>Suggest improvements to website UX/UI based on user feedback.</li>
+                <li>Generate compelling video scripts and storyboards.</li>
+                <li>Automate inventory counting using computer vision.</li>
+                <li>Design effective A/B testing variations for landing pages.</li>
+                <li>Provide real-time data analysis during live meetings.</li>
+                <li>Identify the best times to post content on social media.</li>
+                <li>Create custom API endpoints for integrating different business tools.</li>
+                <li>Automate the generation of personalized sales outreach messages.</li>
+                <li>Suggest optimal delivery routes and logistics planning.</li>
+                <li>Generate compliance reports tailored to specific industry regulations.</li>
+            </ul>
+        </section>
+
+        <section id="club" class="section club-section">
+            <h2 class="section-title">Join the Inner Circle and Start the Paoli A.I. Club</h2>
+            <p>
+                The cosmos of AI is expanding, and you should not be left in the dark. **Join the Eye Try A.I. Club for free** and receive direct access to the most potent knowledge. We are also actively seeking **founding members in Austin, TX** to launch our first local chapter. You'll unlock tutorials on cutting-edge tools, discover hidden trends, receive exclusive business growth ideas, and stay ahead of all the latest algorithmic advancements. **Embark upon this forward-looking journey with us and ascend to a new digital mastery.**
+            </p>
+        </section>
+
+        <section id="contact" class="section contact-section">
+            <h2 class="section-title">Seek Audience with the Eye</h2>
+            <form action="https://formsubmit.co/traxispathfinder@gmail.com" method="POST" class="contact-form">
+                <input type="hidden" name="_next" value="https://yourwebsite.com/thankyou"> <input type="hidden" name="_subject" value="New Submission from Eye Try A.I. Website">
+                
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" id="name" name="Name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="Email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="Phone">
+                </div>
+                
+                <button type="submit" class="submit-button">Send Your Query</button>
+            </form>
+        </section>
+
+        <footer class="site-footer">
+            <p>Austin, TX | Latitude: 34.83° N, Longitude: 97.26° W</p>
+            <div class="social-links">
+                <a href="https://www.youtube.com/@eyetryai" target="_blank" aria-label="YouTube Channel">
+                    <svg class="youtube-icon" viewBox="0 0 24 24">
+                        <path d="M21.543 6.498c-.195-.747-.852-1.302-1.637-1.423C18.423 4.8 12 4.8 12 4.8s-6.423 0-7.906.275c-.785.12-1.442.676-1.637 1.423-.335 1.285-.335 5.92-.335 5.92s0 4.635.335 5.92c.195.747.852 1.302 1.637 1.423C5.577 19.2 12 19.2 12 19.2s6.423 0 7.906-.275c.785-.12 1.442-.676 1.637-1.423.335-1.285.335-5.92.335-5.92s0-4.635-.335-5.92zM9.545 15.3v-6.6l5.42 3.3-5.42 3.3z" fill="#FF0000"/>
+                        <path d="M9.545 15.3v-6.6l5.42 3.3-5.42 3.3z" fill="#FFFFFF"/>
+                    </svg>
+                </a>
+            </div>
+            <p>&copy; 2025 Eye Try A.I. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // === JavaScript for Auto-Updating Clock (Time in Austin, TX - Central Time) ===
+        function updatePaoliTime() {
+            // Options to format the time to the desired locale and time zone
+            const options = {
+                timeZone: 'America/Chicago', // Austin, TX uses Central Time Zone
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true // For AM/PM format
+            };
+
+            const now = new Date();
+            // Get the time string formatted for the Chicago timezone (Central Time)
+            const paoliTimeString = now.toLocaleTimeString('en-US', options);
+
+            // Update the HTML element
+            const timeElement = document.getElementById('current-time-display');
+            if (timeElement) {
+                timeElement.innerHTML = `Austin, TX: ${paoliTimeString}`;
+            }
+        }
+
+        // Run the function immediately to show the time without a delay
+        updatePaoliTime();
+
+        // Use setInterval to call the function every 1000 milliseconds (1 second)
+        // This makes the clock update in real-time.
+        setInterval(updatePaoliTime, 1000);
+
+        // === JavaScript for Open-Meteo 7-Day Forecast (Client-Side Fetch) ===
+        const WEATHER_WMO_CODES = {
+            0: "Clear Sky",
+            1: "Mostly Clear",
+            2: "Partly Cloudy",
+            3: "Overcast",
+            45: "Fog",
+            48: "Depositing Rime Fog",
+            51: "Light Drizzle",
+            53: "Moderate Drizzle",
+            55: "Dense Drizzle",
+            56: "Light Freezing Drizzle",
+            57: "Dense Freezing Drizzle",
+            61: "Slight Rain",
+            63: "Moderate Rain",
+            65: "Heavy Rain",
+            66: "Light Freezing Rain",
+            67: "Heavy Freezing Rain",
+            71: "Slight Snow",
+            73: "Moderate Snow",
+            75: "Heavy Snow",
+            77: "Snow Grains",
+            80: "Slight Showers",
+            81: "Moderate Showers",
+            82: "Violent Showers",
+            85: "Slight Snow Showers",
+            86: "Heavy Snow Showers",
+            95: "Thunderstorm",
+            96: "Thunderstorm w/ Slight Hail",
+            99: "Thunderstorm w/ Heavy Hail"
+        };
+
+        function getWeatherCondition(wmoCode) {
+            return WEATHER_WMO_CODES[wmoCode] || "Unknown Condition";
+        }
+
+        async function fetchPaoliWeather() {
+            const container = document.getElementById('weather-display-container');
+            // CORRECTED COORDINATES
+            const lat = 34.83; // Austin, TX Corrected Latitude
+            const lon = -97.26; // Austin, TX Corrected Longitude
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=7`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // Get the daily arrays
+                const dates = data.daily.time;
+                const maxTemps = data.daily.temperature_2m_max;
+                const minTemps = data.daily.temperature_2m_min;
+                const weatherCodes = data.daily.weather_code;
+
+                let htmlContent = '<ul class="weather-grid">';
+                
+                // Iterate over the 7 days
+                for (let i = 0; i < dates.length; i++) {
+                    const date = new Date(dates[i]);
+                    const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+                    const condition = getWeatherCondition(weatherCodes[i]);
+                    const maxTemp = Math.round(maxTemps[i]);
+                    const minTemp = Math.round(minTemps[i]);
+                    
+                    htmlContent += `
+                        <li class="weather-day">
+                            <strong>${dayName}</strong>
+                            <div class="temps">${maxTemp}° / ${minTemp}° F</div>
+                            <div class="condition">${condition}</div>
+                        </li>
+                    `;
+                }
+
+                htmlContent += '</ul>';
+                container.innerHTML = htmlContent;
+                console.log("Weather updated successfully.");
+
+            } catch (error) {
+                console.error("Error fetching weather data:", error);
+                container.innerHTML = `<p style="text-align: center; color: #ff6347;">Error retrieving weather data. The digital portal is momentarily closed.</p>`;
+            }
+        }
+
+        // Fetch the weather forecast when the page loads
+        fetchPaoliWeather();
+
+        // === MODIFIED: Set the weather update interval to 24 hours ===
+        // 24 hours in milliseconds = 24 * 60 * 60 * 1000 = 86,400,000
+        const dailyUpdateInterval = 86400000; 
+
+        // Set the function to run every 24 hours
+        setInterval(fetchPaoliWeather, dailyUpdateInterval);
+        console.log("Weather forecast daily update scheduled.");
+
+
+        // === JavaScript for Background Audio (Same as before) ===
+        const audio = document.getElementById('background-audio');
+        
+        // Function to attempt playing the audio
+        function tryPlayAudio() {
+            // Check if audio is paused and current time is 0 (to ensure it hasn't played yet)
+            if (audio.paused && audio.currentTime === 0) {
+                audio.play().catch(error => {
+                    // Autoplay blocked by browser policy
+                    console.warn("Audio autoplay was prevented. User must interact further.", error.message);
+                });
+            }
+            // Remove listeners once playback is initiated to prevent multiple plays
+            window.removeEventListener('click', tryPlayAudio);
+            window.removeEventListener('scroll', tryPlayAudio);
+        }
+
+        // Add listeners for the first user interaction (click or scroll)
+        window.addEventListener('click', tryPlayAudio);
+        window.addEventListener('scroll', tryPlayAudio);
+    </script>
+
+</body>
+</html>

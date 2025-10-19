@@ -1,13 +1,13 @@
-name: Dynamic City Repo Creator (Manual-Only Guarantee)
+name: Dynamic City Repo Creator (Final Guaranteed Workflow)
 
 on:
-  # 🛑 CRITICAL FIX: Only the manual trigger is listed. 
-  # This guarantees no other event (like push or schedule) can start the workflow.
+  # 🛑 Only the manual trigger is listed.
   workflow_dispatch: 
-
+  
 permissions:
-  # Minimal permissions for the runner.
-  contents: none
+  # CRITICAL: Grant the default GITHUB_TOKEN write access. 
+  # This often solves permission-related issues for subprocess/git commands running inside the action.
+  contents: write
   pages: none    
   id-token: none 
 
@@ -18,10 +18,11 @@ jobs:
   dynamic_repo_creator:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source Repository
+      - name: Checkout Source Repository (Using NEW7 Token)
         uses: actions/checkout@v4
         with:
-          # Use the NEW7 PAT token to grant cross-repository permissions
+          # Use the NEW7 PAT token to grant cross-repository permissions 
+          # to the Python script execution environment.
           token: ${{ secrets.NEW7 }} 
           fetch-depth: 0 
 
@@ -35,4 +36,6 @@ jobs:
           pip install requests
 
       - name: Execute Python Script (Creates and Pushes New Repos)
+        # This executes your script. The script handles all the heavy lifting 
+        # of creating the new repo, pushing files, and activating GitHub Pages.
         run: python new_website_deployer.py

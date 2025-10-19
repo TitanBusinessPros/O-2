@@ -1,36 +1,28 @@
-name: Automated Weather Update & Pages Deployment
+name: Dynamic City Website Deployment (Manual Only)
 
 on:
-  # Triggers the workflow once a day at 12:00 AM UTC
-  schedule:
-    - cron: '0 0 * * *' 
-  # Allows manual triggering from the Actions tab
-  workflow_dispatch:
-  # Runs when code is pushed to the main branch
-  push:
-    branches:
-      - main 
+  # Allows the workflow to be manually triggered from the GitHub Actions tab.
+  workflow_dispatch: 
 
 permissions:
-  # Required to commit the updated HTML file back to the repo
-  contents: write 
-  # Required to deploy to GitHub Pages
+  # Default minimal permissions for security
+  contents: read
   pages: write    
-  # Required for OIDC authentication by deploy-pages action
   id-token: write 
 
 jobs:
   # ----------------------------------------------------------------
-  # JOB 1: BUILD, UPDATE, AND COMMIT
-  # This job runs the Python script and commits the changes.
+  # JOB 1: BUILD & DEPLOY TO DYNAMIC REPOS
+  # This job runs the Python script and handles all repository creation/pushes.
   # ----------------------------------------------------------------
-  build_and_commit:
+  dynamic_deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository (Full History)
         uses: actions/checkout@v4
         with:
-          # Critical: Fetches full history required by the commit action
+          # Use the NEW7 PAT for cloning/pushing across repos, enabling creation of new city repos
+          token: ${{ secrets.NEW7 }} 
           fetch-depth: 0 
 
       - name: Set up Python Environment
@@ -39,43 +31,38 @@ jobs:
           python-version: '3.x'
 
       - name: Install Python Dependencies
-        # Installs the common 'requests' library for API calls
         run: |
           pip install requests
 
-      - name: Execute Python Script (Updates HTML File)
-        # Assuming your script is named 'new_website_deployer.py'
-        run: python new_website_deployer.py 
+      - name: Execute Python Script (Handles Dynamic Repo Creation/Push)
+        # Your script, 'new_website_deployer.py', must contain the logic 
+        # to create and push the new city-specific GitHub Pages repository.
+        run: python new_website_deployer.py
 
-      - name: Commit and Push Updated HTML File
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: '🤖 Automated weather data refresh: index.html'
-          # CRITICAL: Specify the EXACT HTML file name you want to commit
-          files: 'index.html' 
-          branch: ${{ github.ref_name }}
-
-      - name: Setup Pages Environment
+      # --- Deployment for the current 'O-2' repo (Standard GitHub Pages) ---
+      # This part ensures the *current* repository is also updated and deployed.
+      
+      - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload Deployment Artifact
+      - name: Upload Current Artifact (index.html, new.txt, etc.)
         uses: actions/upload-pages-artifact@v3
         with:
-          # Uploads the entire contents of the current folder, including the updated HTML file
+          # Uploads all files required for the current O-2 Pages site
           path: './' 
 
   # ----------------------------------------------------------------
-  # JOB 2: DEPLOY
-  # This job takes the artifact and makes the site live.
+  # JOB 2: DEPLOY (Standard O-2 Repo Pages Deployment)
+  # This makes the current O-2 URL live with the latest changes.
   # ----------------------------------------------------------------
-  deploy:
+  deploy_o2_pages:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # This URL is fixed to the O-2 repo: https://titanbusinesspros.github.io/O-2/
+      url: ${{ steps.deployment.outputs.page_url }} 
     runs-on: ubuntu-latest
-    # Ensures this job only starts after the previous one successfully committed the files
-    needs: build_and_commit 
+    needs: dynamic_deploy 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages (O-2 Repo)
         id: deployment
         uses: actions/deploy-pages@v4

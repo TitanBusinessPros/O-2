@@ -135,7 +135,7 @@
             color: var(--color-text-dim);
         }
         
-        /* New section for Paoli, OK */
+        /* New section for Ardmore, OK */
         .paoli-section {
             background-color: rgba(255, 215, 0, 0.05);
             padding: 3rem 1rem;
@@ -504,7 +504,7 @@
         
         <section id="weather-forecast" class="section">
             <h2 class="section-title">The Arcane Forecast (7-Day)</h2>
-            <p class="section-subtitle">A prediction of the elemental forces in Paoli, OK.</p>
+            <p class="section-subtitle">A prediction of the elemental forces in Ardmore, OK.</p>
             <div id="weather-display-container">
                 <p style="text-align: center; color: var(--color-accent-gold);">Initiating meteorological scan...</p>
             </div>
@@ -540,7 +540,7 @@
         </section>
 
         <section id="local-businesses" class="section local-business-section">
-            <h2 class="section-title">Local Businesses In & Near Paoli, OK (Verified)</h2>
+            <h2 class="section-title">Local Businesses In & Near Ardmore, OK (Verified)</h2>
             <p class="section-subtitle">A curated directory of quality local spots in our community, drawing from Paoli and nearby Pauls Valley.</p>
 
             <h3>Barbershops</h3>
@@ -636,7 +636,7 @@
                 <li>
                     <strong>Paoli Public Schools Library</strong>
                     <p>School library resources that benefit students and may serve the local community (limited hours).</p>
-                    <p>Address: 410 W Stewart St, Paoli, OK 73074</p>
+                    <p>Address: 410 W Stewart St, Ardmore, OK 73074</p>
                     <a href="https://www.paoli.k12.ok.us/page/about-us" target="_blank">Verify Paoli School Details</a>
                 </li>
                 <li>
@@ -771,7 +771,7 @@
         <section id="club" class="section club-section">
             <h2 class="section-title">Join the Inner Circle and Start the Paoli A.I. Club</h2>
             <p>
-                The cosmos of AI is expanding, and you should not be left in the dark. **Join the Eye Try A.I. Club for free** and receive direct access to the most potent knowledge. We are also actively seeking **founding members in Paoli, OK** to launch our first local chapter. You'll unlock tutorials on cutting-edge tools, discover hidden trends, receive exclusive business growth ideas, and stay ahead of all the latest algorithmic advancements. **Embark upon this forward-looking journey with us and ascend to a new digital mastery.**
+                The cosmos of AI is expanding, and you should not be left in the dark. **Join the Eye Try A.I. Club for free** and receive direct access to the most potent knowledge. We are also actively seeking **founding members in Ardmore, OK** to launch our first local chapter. You'll unlock tutorials on cutting-edge tools, discover hidden trends, receive exclusive business growth ideas, and stay ahead of all the latest algorithmic advancements. **Embark upon this forward-looking journey with us and ascend to a new digital mastery.**
             </p>
         </section>
 
@@ -800,7 +800,7 @@
         </section>
 
         <footer class="site-footer">
-            <p>Paoli, OK | Latitude: 34.83° N, Longitude: 97.26° W</p>
+            <p>Ardmore, OK | Latitude: 34.83° N, Longitude: 97.26° W</p>
             <div class="social-links">
                 <a href="https://www.youtube.com/@eyetryai" target="_blank" aria-label="YouTube Channel">
                     <svg class="youtube-icon" viewBox="0 0 24 24">
@@ -814,11 +814,11 @@
     </div>
 
     <script>
-        // === JavaScript for Auto-Updating Clock (Time in Paoli, OK - Central Time) ===
+        // === JavaScript for Auto-Updating Clock (Time in Ardmore, OK - Central Time) ===
         function updatePaoliTime() {
             // Options to format the time to the desired locale and time zone
             const options = {
-                timeZone: 'America/Chicago', // Paoli, OK uses Central Time Zone
+                timeZone: 'America/Chicago', // Ardmore, OK uses Central Time Zone
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
@@ -832,7 +832,7 @@
             // Update the HTML element
             const timeElement = document.getElementById('current-time-display');
             if (timeElement) {
-                timeElement.innerHTML = `Paoli, OK: ${paoliTimeString}`;
+                timeElement.innerHTML = `Ardmore, OK: ${paoliTimeString}`;
             }
         }
 
@@ -882,8 +882,8 @@
         async function fetchPaoliWeather() {
             const container = document.getElementById('weather-display-container');
             // CORRECTED COORDINATES
-            const lat = 34.83; // Paoli, OK Corrected Latitude
-            const lon = -97.26; // Paoli, OK Corrected Longitude
+            const lat = 34.83; // Ardmore, OK Corrected Latitude
+            const lon = -97.26; // Ardmore, OK Corrected Longitude
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=7`;
 
             try {

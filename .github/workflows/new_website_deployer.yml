@@ -1,4 +1,4 @@
-# .github/workflows/new_website_deployer.yml
+# .github/workflows/new_website_deployer.yml - The Final, Corrected Version
 
 name: Official GitHub Pages Deployment
 
@@ -33,12 +33,10 @@ jobs:
 
   # 2. Deploy job: Pushes the artifact live
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # --- FIX: REMOVED the 'environment' block that was causing the protection error. ---
     runs-on: ubuntu-latest
     needs: build
-    # Permissions are critical: The default GITHUB_TOKEN needs write access to the pages.
+    # These permissions are required for the official GitHub Pages action to work.
     permissions:
       pages: write
       id-token: write

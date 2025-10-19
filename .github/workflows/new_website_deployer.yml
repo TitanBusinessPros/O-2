@@ -1,4 +1,4 @@
-# .github/workflows/new_website_deployer.yml - The Final, Corrected Version
+# .github/workflows/new_website_deployer.yml - THE FINAL WORKING VERSION
 
 name: Official GitHub Pages Deployment
 
@@ -33,7 +33,10 @@ jobs:
 
   # 2. Deploy job: Pushes the artifact live
   deploy:
-    # --- FIX: REMOVED the 'environment' block that was causing the protection error. ---
+    # --- THIS BLOCK IS REQUIRED BY THE DEPLOY-PAGES ACTION ---
+    environment:
+      name: github-pages
+    # --------------------------------------------------------
     runs-on: ubuntu-latest
     needs: build
     # These permissions are required for the official GitHub Pages action to work.

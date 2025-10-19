@@ -1,40 +1,11 @@
-# .github/workflows/new_website_deployer.yml
+GitHub Pages Jekyll
+By GitHub Actions
 
-name: Final Working GitHub Pages Deploy
+GitHub Pages Jekyll logo
+Package a Jekyll site with GitHub Pages dependencies preinstalled.
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+Static HTML
+By GitHub Actions
 
-jobs:
-  # The entire process is run in one job, making it simpler.
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # Needed for the checkout step
-      pages: write    # Needed for the deploy-pages action
-      id-token: write # Needed for authentication with GitHub Pages
-    steps:
-      - name: 1. Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 2. Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: 3. Run City/State Replacement Script
-        # This executes your existing Python script
-        run: python new_website_deployer.py
-        
-      - name: 4. Upload Deployment Artifact
-        # This action bundles your modified files (the root directory)
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: . # Uploads all files in the current root directory
-
-      - name: 5. Deploy to GitHub Pages
-        # This action automatically handles the deployment using the built-in token
-        uses: actions/deploy-pages@v4
+Static HTML logo
+Deploy static files in a repository without a build.

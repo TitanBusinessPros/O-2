@@ -8,15 +8,6 @@ on:
         required: true
         default: 'DEPLOY'
 
-# EXPLICITLY disable GitHub Pages for this workflow
-permissions:
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -39,15 +30,15 @@ jobs:
     - name: Validate new.txt file
       run: |
         if [ ! -f "new.txt" ]; then
-          echo "Error: new.txt file not found"
+          echo "❌ Error: new.txt file not found"
           exit 1
         fi
         CONTENT=$(cat new.txt)
         if [[ ! "$CONTENT" =~ ^[A-Za-z]+-[A-Za-z]+$ ]]; then
-          echo "Error: new.txt must contain city-state format like 'Dallas-Texas'"
+          echo "❌ Error: new.txt must contain city-state format like 'Dallas-Texas'"
           exit 1
         fi
-        echo "Valid city-state format: $CONTENT"
+        echo "✅ Valid city-state format: $CONTENT"
         
     - name: Deploy new city website
       env:
@@ -65,19 +56,10 @@ jobs:
           cat deployment_error.txt
           exit 1
         else:
-          echo "⚠️  Unknown deployment status"
+          echo "⚠️ Unknown deployment status"
           exit 1
           
     - name: Cleanup status files
       if: always()
       run: |
         rm -f deployment_success.txt deployment_error.txt
-        
-    - name: Archive deployment log
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: deployment-log
-        path: |
-          new.txt
-        retention-days: 1

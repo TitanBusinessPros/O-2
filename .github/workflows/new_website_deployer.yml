@@ -1,28 +1,90 @@
-name: Deploy City Website
+name: Deploy New City Website
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_deployment:
+        description: 'Type "DEPLOY" to confirm new repository creation'
+        required: true
+        default: 'DEPLOY'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_deployment == 'DEPLOY' }}
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install PyGithub requests
-      
-      - name: Run deployment script
-        env:
-          GITHUB_TOKEN: ${{ secrets.NEW7 }}
-        run: |
-          python new_website_deployer.py
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests PyGithub
+        
+    - name: Debug - Initial state check
+      run: |
+        echo "=== INITIAL STATE DEBUG ==="
+        echo "Current directory: $(pwd)"
+        echo "Files:"
+        ls -la
+        echo "--- new.txt content ---"
+        cat new.txt
+        echo "--- index.html first 200 chars ---"
+        head -c 200 index.html
+        echo ""
+        echo "=========================="
+        
+    - name: Validate new.txt file
+      run: |
+        if [ ! -f "new.txt" ]; then
+          echo "❌ Error: new.txt file not found"
+          exit 1
+        fi
+        CONTENT=$(cat new.txt)
+        if [[ ! "$CONTENT" =~ ^[A-Za-z]+-[A-Za-z]+$ ]]; then
+          echo "❌ Error: new.txt must contain city-state format like 'Dallas-Texas'"
+          exit 1
+        fi
+        echo "✅ Valid city-state format: $CONTENT"
+        
+    - name: Deploy new city website
+      env:
+        GITHUB_TOKEN: ${{ secrets.NEW7 }}
+      run: |
+        echo "=== Starting Python script ==="
+        python new_website_deployer.py
+        echo "=== Python script completed ==="
+        
+    - name: Debug - Check for status files
+      run: |
+        echo "=== Checking for status files ==="
+        ls -la deployment_success.txt 2>/dev/null && echo "✅ deployment_success.txt exists" || echo "❌ deployment_success.txt not found"
+        ls -la deployment_error.txt 2>/dev/null && echo "✅ deployment_error.txt exists" || echo "❌ deployment_error.txt not found"
+        
+    - name: Check deployment status
+      run: |
+        echo "=== Checking deployment status ==="
+        if [ -f "deployment_success.txt" ]; then
+          echo "✅ Deployment successful!"
+          cat deployment_success.txt
+        elif [ -f "deployment_error.txt" ]; then
+          echo "❌ Deployment failed!"
+          cat deployment_error.txt
+          exit 1
+        else
+          echo "⚠️ Unknown deployment status - no status files found"
+          exit 1
+        fi
+          
+    - name: Cleanup status files
+      if: always()
+      run: |
+        echo "=== Cleaning up status files ==="
+        rm -f deployment_success.txt deployment_error.txt
+        echo "✅ Cleanup completed"

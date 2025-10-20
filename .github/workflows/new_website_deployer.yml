@@ -53,49 +53,38 @@ jobs:
         fi
         echo "✅ Valid city-state format: $CONTENT"
         
-    - name: Run Python script with enhanced debugging
+    - name: Deploy new city website
       env:
         GITHUB_TOKEN: ${{ secrets.NEW7 }}
       run: |
-        echo "=== STARTING PYTHON SCRIPT ==="
-        python -c "
-import sys
-print('Python path:', sys.executable)
-print('Python version:', sys.version)
-"
+        echo "=== Starting Python script ==="
         python new_website_deployer.py
-        echo "=== PYTHON SCRIPT COMPLETED ==="
+        echo "=== Python script completed ==="
         
-    - name: Debug - Check Python script output
+    - name: Debug - Check for status files
       run: |
-        echo "=== CHECKING PYTHON SCRIPT RESULTS ==="
-        echo "Status files:"
-        ls -la deployment_*.txt 2>/dev/null || echo "No status files found"
+        echo "=== Checking for status files ==="
+        ls -la deployment_success.txt 2>/dev/null && echo "✅ deployment_success.txt exists" || echo "❌ deployment_success.txt not found"
+        ls -la deployment_error.txt 2>/dev/null && echo "✅ deployment_error.txt exists" || echo "❌ deployment_error.txt not found"
         
+    - name: Check deployment status
+      run: |
+        echo "=== Checking deployment status ==="
         if [ -f "deployment_success.txt" ]; then
-          echo "✅ SUCCESS FILE FOUND:"
+          echo "✅ Deployment successful!"
           cat deployment_success.txt
         elif [ -f "deployment_error.txt" ]; then
-          echo "❌ ERROR FILE FOUND:"
+          echo "❌ Deployment failed!"
           cat deployment_error.txt
-        else:
-          echo "⚠️ NO STATUS FILES - Script may have crashed"
-        echo "================================"
-        
-    - name: Debug - Check if HTML was modified locally (should not be)
-      run: |
-        echo "=== CHECKING LOCAL HTML STATE ==="
-        echo "Local index.html should NOT be modified. Checking..."
-        if grep -q "Fairfield" index.html; then
-          echo "❌ LOCAL HTML WAS MODIFIED - This should not happen!"
-          echo "First 500 chars with Fairfield:"
-          grep -A 5 -B 5 "Fairfield" index.html || echo "Pattern not found in context"
+          exit 1
         else
-          echo "✅ Local HTML unchanged (good)"
+          echo "⚠️ Unknown deployment status - no status files found"
+          exit 1
         fi
-        echo "================================="
           
     - name: Cleanup status files
       if: always()
       run: |
+        echo "=== Cleaning up status files ==="
         rm -f deployment_success.txt deployment_error.txt
+        echo "✅ Cleanup completed"

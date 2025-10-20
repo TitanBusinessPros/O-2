@@ -1,163 +1,368 @@
+#!/usr/bin/env python3
 import os
 import requests
-import subprocess
-import shutil
+import time
+import json
+import re
+from datetime import datetime
+import base64
+from github import Github, GithubException
 
-# --- Configuration ---
-GITHUB_USERNAME = "titanbusinesspros"
-GITHUB_TOKEN = os.environ.get('NEW7') 
-CITY_FILE = "new.txt"
+# Configuration
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY')  # Fallback for geocoding
 
-# 🛑 CRITICAL FIX: Use the actual source file name
-SOURCE_HTML_FILE = "Eye-Paoli-Gold.html"
-# 🛑 CRITICAL FIX: The file MUST be renamed to index.html for GitHub Pages to serve the root site
-TARGET_DEPLOY_FILE = "index.html" 
-
-NOJEKYLL_FILE = ".nojekyll" 
-
-# --- Functions ---
-
-def read_and_clean_city_info(filename):
-    """Reads the city/state and generates a repo-safe name."""
+def read_city_from_file():
+    """Read city-state from new.txt file"""
     try:
-        with open(filename, 'r') as f:
-            city_state = f.readline().strip()
-            if not city_state:
-                raise ValueError("City file is empty.")
-            
-            repo_name = city_state.lower().replace(', ', '-').replace(' ', '-')
-            return city_state, repo_name
+        with open('new.txt', 'r') as f:
+            content = f.read().strip()
+            if '-' in content:
+                return content
+            else:
+                raise ValueError("File should contain city-state format like 'Dallas-Texas'")
+    except FileNotFoundError:
+        raise Exception("new.txt file not found")
+
+def geocode_city(city_state):
+    """Get latitude and longitude for city using Nominatim"""
+    city, state = city_state.split('-')
+    time.sleep(1)  # Rate limiting
+    
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        'q': f"{city}, {state}, USA",
+        'format': 'json',
+        'limit': 1
+    }
+    
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    
+    data = response.json()
+    if not data:
+        # Fallback to approximate coordinates for the state
+        print(f"Warning: Could not find exact coordinates for {city_state}, using state center")
+        state_coords = {
+            'Texas': (31.9686, -99.9018),
+            'Oklahoma': (35.4676, -97.5164),
+            'California': (36.7783, -119.4179),
+            'New York': (43.2994, -74.2179),
+            'Florida': (27.6648, -81.5158)
+        }
+        if state in state_coords:
+            return state_coords[state]
+        else:
+            return (39.8283, -98.5795)  # US center
+    
+    return (float(data[0]['lat']), float(data[0]['lon']))
+
+def get_weather_forecast(lat, lon):
+    """Get 7-day weather forecast from Open-Meteo"""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        'latitude': lat,
+        'longitude': lon,
+        'daily': 'temperature_2m_max,temperature_2m_min,weathercode',
+        'temperature_unit': 'fahrenheit',
+        'timezone': 'auto',
+        'forecast_days': 7
+    }
+    
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    return response.json()
+
+def get_wikipedia_summary(city_state):
+    """Get city summary from Wikipedia API"""
+    city, state = city_state.split('-')
+    time.sleep(1)  # Rate limiting
+    
+    url = "https://en.wikipedia.org/api/rest_v1/page/summary/"
+    search_term = f"{city}, {state}"
+    
+    try:
+        response = requests.get(url + search_term.replace(' ', '_'))
+        response.raise_for_status()
+        data = response.json()
+        return data.get('extract', f"{city}, {state} is a location with rich local history and community.")
+    except:
+        return f"{city}, {state} is a community with unique local character and growing opportunities for digital innovation and business development."
+
+def query_overpass(category, lat, lon, radius=15000):
+    """Query OverPass API for local businesses with 5-second delay between categories"""
+    overpass_queries = {
+        'barbers': f"""
+        [out:json][timeout:25];
+        (
+          node["shop"="hairdresser"](around:{radius},{lat},{lon});
+          node["amenity"="barber"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        'bars': f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"="bar"](around:{radius},{lat},{lon});
+          node["amenity"="pub"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        'diners_cafes': f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"="cafe"](around:{radius},{lat},{lon});
+          node["amenity"="restaurant"](around:{radius},{lat},{lon});
+          node["amenity"="fast_food"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        'libraries': f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"="library"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        'attractions_amusements': f"""
+        [out:json][timeout:25];
+        (
+          node["tourism"="attraction"](around:{radius},{lat},{lon});
+          node["tourism"="museum"](around:{radius},{lat},{lon});
+          node["leisure"="park"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        'coffee_shops': f"""
+        [out:json][timeout:25];
+        (
+          node["amenity"="cafe"]["cuisine"="coffee_shop"](around:{radius},{lat},{lon});
+          node["shop"="coffee"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """
+    }
+    
+    if category not in overpass_queries:
+        return []
+    
+    url = "https://overpass-api.de/api/interpreter"
+    
+    try:
+        response = requests.post(url, data=overpass_queries[category])
+        response.raise_for_status()
+        data = response.json()
+        return data.get('elements', [])
     except Exception as e:
-        print(f"Error reading city file: {e}")
-        return None, None
+        print(f"Error querying OverPass for {category}: {e}")
+        return []
 
-def create_github_repo(repo_name):
-    """Creates a new, public GitHub repository using the API."""
-    if not GITHUB_TOKEN:
-        print("ERROR: GITHUB_TOKEN (NEW7) not found in environment variables.")
-        return False
+def process_business_data(businesses, category):
+    """Process and format business data from OverPass"""
+    processed = []
+    for business in businesses[:3]:  # Limit to 3 per category
+        name = business.get('tags', {}).get('name', 'Unnamed Business')
+        address = business.get('tags', {}).get('addr:street', 'Address not available')
+        website = business.get('tags', {}).get('website', '#')
         
-    api_url = f"https://api.github.com/user/repos"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    payload = {
-        "name": repo_name,
-        "description": f"Dynamic GitHub Pages site for {repo_name}",
-        "private": False, 
-    }
+        processed.append({
+            'name': name,
+            'address': address,
+            'website': website
+        })
+    
+    # Add fallback examples if no businesses found
+    if not processed:
+        fallbacks = {
+            'barbers': [
+                {'name': 'Local Barber Shop', 'address': 'Main Street', 'website': '#'},
+                {'name': 'Professional Cuts', 'address': 'Downtown Area', 'website': '#'}
+            ],
+            'coffee_shops': [
+                {'name': 'Local Coffee House', 'address': 'Central Avenue', 'website': '#'},
+                {'name': 'Downtown Cafe', 'address': 'Business District', 'website': '#'}
+            ],
+            'bars': [
+                {'name': 'Local Pub', 'address': 'Main Street', 'website': '#'},
+                {'name': 'City Bar', 'address': 'Downtown Area', 'website': '#'}
+            ],
+            'diners_cafes': [
+                {'name': 'Family Diner', 'address': 'Central Avenue', 'website': '#'},
+                {'name': 'Local Cafe', 'address': 'Business District', 'website': '#'}
+            ],
+            'libraries': [
+                {'name': 'Public Library', 'address': 'Community Center', 'website': '#'}
+            ],
+            'attractions_amusements': [
+                {'name': 'Community Park', 'address': 'Recreation Area', 'website': '#'},
+                {'name': 'Local Museum', 'address': 'Cultural District', 'website': '#'}
+            ]
+        }
+        processed = fallbacks.get(category, [{'name': f'Local {category.title()}', 'address': 'Check local directory', 'website': '#'}])
+    
+    return processed
 
-    response = requests.post(api_url, headers=headers, json=payload)
+def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
+    """Update the HTML template with new city data"""
+    with open('index.html', 'r', encoding='utf-8') as f:
+        html_content = f.read()
     
-    if response.status_code == 201:
-        print(f"✅ Repository '{repo_name}' created successfully.")
-        return True
-    elif response.status_code == 422 and "name already exists" in response.text:
-        print(f"⚠️ Repository '{repo_name}' already exists. Continuing to deployment.")
-        return True
-    else:
-        print(f"❌ Failed to create repository '{repo_name}'. Status: {response.status_code}")
-        print("API Response:", response.json())
-        return False
-
-def activate_github_pages(repo_name):
-    """ACTIVATES GitHub Pages on the new repository after files are pushed."""
-    print(f"Attempting to activate GitHub Pages for {repo_name}...")
+    city, state = city_state.split('-')
     
-    api_url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{repo_name}/pages"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
+    # Update city-state references throughout the document
+    html_content = html_content.replace('Paoli, Oklahoma', f'{city}, {state}')
+    html_content = html_content.replace('Paoli, OK', f'{city}, {state}')
+    html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
+    html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
+    
+    # Update Nexus Point section
+    nexus_pattern = r'<section id="paoli-ok".*?<p>(.*?)</p>'
+    new_nexus_content = f'''
+        <section id="paoli-ok" class="section paoli-section">
+            <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
+            <p>
+                {wiki_summary}
+            </p>
+        </section>
+    '''
+    html_content = re.sub(nexus_pattern, new_nexus_content, html_content, flags=re.DOTALL)
+    
+    # Update weather section coordinates
+    weather_js_pattern = r'const lat = [\d.-]+;.*?const lon = [\d.-]+;'
+    new_weather_js = f'const lat = {lat}; // {city}, {state} Latitude\n            const lon = {lon}; // {city}, {state} Longitude'
+    html_content = re.sub(weather_js_pattern, new_weather_js, html_content, flags=re.DOTALL)
+    
+    # Update local businesses section
+    business_sections = {
+        'barbers': 'Barbershops',
+        'coffee_shops': 'Coffee Shops',
+        'diners_cafes': 'Diners & Cafés',
+        'bars': 'Local Bars & Pubs',
+        'libraries': 'Libraries',
+        'attractions_amusements': 'Attractions & Amusements'
     }
     
-    payload = {
-      "source": {
-        "branch": "main",
-        "path": "/"
-      }
-    }
-    
-    response = requests.post(api_url, headers=headers, json=payload)
-    
-    if response.status_code == 201 or response.status_code == 409:
-        print(f"✅ GitHub Pages activated successfully for {repo_name} (or was already active).")
-        return True
-    else:
-        print(f"❌ Failed to activate GitHub Pages for {repo_name}. Status: {response.status_code}")
-        print("API Response:", response.json())
-        return False
-
-
-def push_to_new_repo(repo_name, city_state):
-    """Pushes files to the new city-specific repository's main branch."""
-    
-    # 1. Create temporary deployment directory
-    deploy_dir = f"temp_deploy_{repo_name}"
-    if os.path.exists(deploy_dir):
-        shutil.rmtree(deploy_dir)
-    os.makedirs(deploy_dir)
-    
-    # 🛑 CRITICAL FIX: Copy the source file and rename it to the target name (index.html)
-    if os.path.exists(SOURCE_HTML_FILE):
-        shutil.copy(SOURCE_HTML_FILE, os.path.join(deploy_dir, TARGET_DEPLOY_FILE))
-    else:
-        print(f"❌ ERROR: Source file '{SOURCE_HTML_FILE}' not found in the repository.")
-        return False
+    for category, section_title in business_sections.items():
+        section_pattern = f'<h3>{section_title}</h3>.*?</ul>'
+        new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
         
-    # Copy .nojekyll
-    if os.path.exists(NOJEKYLL_FILE):
-        shutil.copy(NOJEKYLL_FILE, deploy_dir)
-    else:
-         with open(os.path.join(deploy_dir, NOJEKYLL_FILE), 'w') as f:
-            pass
+        for business in business_data.get(category, []):
+            new_section += f'''
+                <li>
+                    <strong>{business["name"]}</strong>
+                    <p>Local business serving the {city} community.</p>
+                    <p>Address: {business["address"]}</p>
+                    <a href="{business["website"]}" target="_blank">View Details</a>
+                </li>
+            '''
+        
+        new_section += '            </ul>'
+        html_content = re.sub(section_pattern, new_section, html_content, flags=re.DOTALL)
+    
+    return html_content
 
-    # 2. Initialize Git and commit
-    os.chdir(deploy_dir)
+def create_github_repo(city_state, updated_html):
+    """Create new GitHub repository and push files"""
+    g = Github(GITHUB_TOKEN)
+    user = g.get_user()
     
-    subprocess.run(['git', 'config', 'user.name', 'GitHub Actions Bot'], check=True)
-    subprocess.run(['git', 'config', 'user.email', 'actions@github.com'], check=True)
+    repo_name = f"{city_state.replace('-', '').replace(' ', '').lower()}"
     
-    subprocess.run(['git', 'init'], check=True)
-    subprocess.run(['git', 'add', TARGET_DEPLOY_FILE, NOJEKYLL_FILE], check=True)
-    commit_message = f'Automated deployment for city site: {city_state}'
-    subprocess.run(['git', 'commit', '-m', commit_message], check=True)
-    
-    # 3. Set remote URL and push
-    remote_url = f"https://{GITHUB_USERNAME}:{GITHUB_TOKEN}@github.com/{GITHUB_USERNAME}/{repo_name}.git"
-    
-    subprocess.run(['git', 'branch', '-M', 'main'], check=True)
-    
-    success = False
     try:
-        subprocess.run(['git', 'push', '-f', remote_url, 'main'], check=True)
-        print(f"✅ Git push successful for {repo_name}.")
-        success = True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ Git Push failed to new repository: {e}")
-    finally:
-        os.chdir('..')
-        shutil.rmtree(deploy_dir)
-        return success
-
-# --- Main Execution ---
-if __name__ == "__main__":
-    # Check if the required files exist before starting
-    if not os.path.exists(CITY_FILE):
-        print(f"FATAL ERROR: Required file '{CITY_FILE}' not found.")
-        exit(1)
-    if not os.path.exists(SOURCE_HTML_FILE):
-        print(f"FATAL ERROR: Source HTML file '{SOURCE_HTML_FILE}' not found.")
-        exit(1)
-        
-    city_state, repo_name = read_and_clean_city_info(CITY_FILE)
+        # Create new repository
+        repo = user.create_repo(
+            repo_name,
+            description=f"Eye Try A.I. - {city_state}",
+            private=False,
+            auto_init=False
+        )
+        print(f"Created repository: {repo.html_url}")
+    except GithubException as e:
+        if e.status == 422:  # Repository already exists
+            repo = user.get_repo(repo_name)
+            print(f"Repository already exists: {repo.html_url}")
+        else:
+            raise
     
-    if repo_name:
-        # 1. Create the repository on GitHub
-        if create_github_repo(repo_name):
-            # 2. Push the files to the new repository
-            if push_to_new_repo(repo_name, city_state):
-                # 3. Activate GitHub Pages after files are pushed
-                activate_github_pages(repo_name)
-    else:
-        print("Script failed to run: Invalid city information.")
+    # Create and push files
+    files_to_push = {
+        'index.html': updated_html,
+        '.nojekyll': ''
+    }
+    
+    for filename, content in files_to_push.items():
+        try:
+            repo.create_file(
+                filename,
+                f"Initial commit for {city_state}",
+                content,
+                branch="main"
+            )
+            print(f"Created {filename} in repository")
+        except GithubException as e:
+            print(f"File {filename} may already exist: {e}")
+    
+    # Enable GitHub Pages
+    try:
+        repo.edit(has_pages=True)
+        repo.create_pages_site(branch="main", path="/")
+        print("GitHub Pages enabled")
+    except Exception as e:
+        print(f"Note: GitHub Pages setup may need manual configuration: {e}")
+    
+    return repo.html_url
+
+def main():
+    print("Starting website deployment process...")
+    
+    try:
+        # Read city from file
+        city_state = read_city_from_file()
+        print(f"Processing city: {city_state}")
+        
+        # Get coordinates
+        lat, lon = geocode_city(city_state)
+        print(f"Coordinates: {lat}, {lon}")
+        
+        # Get weather data
+        weather_data = get_weather_forecast(lat, lon)
+        print("Weather data retrieved")
+        
+        # Get Wikipedia summary
+        wiki_summary = get_wikipedia_summary(city_state)
+        print("Wikipedia summary retrieved")
+        
+        # Get business data from OverPass with 5-second delays
+        business_data = {}
+        categories = ['barbers', 'bars', 'diners_cafes', 'libraries', 'attractions_amusements', 'coffee_shops']
+        
+        for i, category in enumerate(categories):
+            print(f"Querying {category}...")
+            businesses = query_overpass(category, lat, lon)
+            business_data[category] = process_business_data(businesses, category)
+            
+            if i < len(categories) - 1:  # Don't sleep after last category
+                print("Waiting 5 seconds for next OverPass query...")
+                time.sleep(5)  # 5 seconds
+        
+        # Update HTML template
+        updated_html = update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data)
+        print("HTML template updated")
+        
+        # Create GitHub repository
+        repo_url = create_github_repo(city_state, updated_html)
+        print(f"Deployment completed: {repo_url}")
+        
+        # Write success file for workflow
+        with open('deployment_success.txt', 'w') as f:
+            f.write(f"Successfully deployed {city_state} to {repo_url}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        # Write error file for workflow
+        with open('deployment_error.txt', 'w') as f:
+            f.write(f"Deployment failed: {str(e)}")
+        raise
+
+if __name__ == "__main__":
+    main()

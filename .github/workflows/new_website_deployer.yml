@@ -8,20 +8,24 @@ on:
         required: true
         default: 'DEPLOY'
 
+# EXPLICITLY disable GitHub Pages for this workflow
+permissions:
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_deployment == 'DEPLOY' }}
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Verify deployment confirmation
-      if: ${{ github.event.inputs.confirm_deployment != 'DEPLOY' }}
-      run: |
-        echo "Error: You must type 'DEPLOY' to confirm deployment"
-        exit 1
-        
     - name: Set up Python
       uses: actions/setup-python@v4
       with:

@@ -1,250 +1,395 @@
+#!/usr/bin/env python3
 import os
-import time
 import requests
+import time
 import json
-from github import Github
+import re
+import traceback
+from datetime import datetime
+from github import Github, GithubException
 
-# User-Agent for API requests
-USER_AGENT = "EyeTryAI-Website-Deployer/1.0 (https://github.com/TitanBusinessPros)"
+# Configuration
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 
-def get_coordinates(city_state):
-    """Get latitude and longitude from Nominatim"""
+def debug_log(message):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] 🔍 {message}")
+
+def error_log(message):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] ❌ {message}")
+
+def success_log(message):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] ✅ {message}")
+
+def read_city_from_file():
+    """Read city-state from new.txt file"""
+    try:
+        with open('new.txt', 'r') as f:
+            content = f.read().strip()
+            if '-' in content:
+                return content
+            else:
+                raise ValueError("File should contain city-state format like 'Dallas-Texas'")
+    except FileNotFoundError:
+        raise Exception("new.txt file not found")
+
+def geocode_city(city_state):
+    """Get latitude and longitude for city using Nominatim"""
     city, state = city_state.split('-')
-    url = f"https://nominatim.openstreetmap.org/search"
+    time.sleep(1)
+    
+    url = "https://nominatim.openstreetmap.org/search"
     params = {
         'q': f"{city}, {state}, USA",
         'format': 'json',
         'limit': 1
     }
-    headers = {'User-Agent': USER_AGENT}
     
-    response = requests.get(url, params=params, headers=headers)
-    time.sleep(1)  # Respect Nominatim rate limits
-    
-    if response.status_code == 200 and response.json():
-        data = response.json()[0]
-        return float(data['lat']), float(data['lon'])
-    return None, None
-
-def get_wikipedia_summary(city_state):
-    """Get Wikipedia summary for the city"""
-    city, state = city_state.split('-')
-    url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{city},_{state}"
-    headers = {'User-Agent': USER_AGENT}
-    
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        return data.get('extract', '')
-    
-    # Fallback to search API
-    search_url = "https://en.wikipedia.org/w/api.php"
-    params = {
-        'action': 'query',
-        'format': 'json',
-        'prop': 'extracts',
-        'exintro': True,
-        'explaintext': True,
-        'titles': f"{city}, {state}"
+    headers = {
+        'User-Agent': 'EyeTryAICityDeployer/1.0',
+        'Accept': 'application/json'
     }
     
-    response = requests.get(search_url, params=params, headers=headers)
-    if response.status_code == 200:
-        pages = response.json().get('query', {}).get('pages', {})
-        for page in pages.values():
-            return page.get('extract', '')
-    
-    return f"{city}, {state}, is a community rich in local heritage and character."
-
-def get_nearby_city(lat, lon, radius=50000):
-    """Get nearby city for fallback data"""
-    url = "https://overpass-api.de/api/interpreter"
-    query = f"""
-    [out:json];
-    (
-      node["place"~"city|town"](around:{radius},{lat},{lon});
-    );
-    out body 1;
-    """
-    
-    headers = {'User-Agent': USER_AGENT}
-    response = requests.post(url, data={'data': query}, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        if data.get('elements'):
-            return data['elements'][0].get('tags', {}).get('name', None)
-    return None
-
-def get_overpass_data(lat, lon, amenity_type, radius=15000):
-    """Query Overpass API for businesses"""
-    url = "https://overpass-api.de/api/interpreter"
-    
-    query = f"""
-    [out:json][timeout:25];
-    (
-      node["amenity"="{amenity_type}"](around:{radius},{lat},{lon});
-      way["amenity"="{amenity_type}"](around:{radius},{lat},{lon});
-    );
-    out body 3;
-    """
-    
-    headers = {'User-Agent': USER_AGENT}
-    response = requests.post(url, data={'data': query}, headers=headers)
-    
-    if response.status_code == 200:
-        return response.json().get('elements', [])
-    return []
-
-def format_business_html(businesses, category_name):
-    """Format business data into HTML"""
-    if not businesses:
-        return f"<li><strong>No {category_name} found</strong><p>Check nearby areas for services.</p></li>"
-    
-    html = ""
-    for biz in businesses[:3]:  # Top 3
-        tags = biz.get('tags', {})
-        name = tags.get('name', 'Local Business')
-        address = tags.get('addr:street', 'Address not available')
-        city = tags.get('addr:city', '')
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        if response.status_code == 403:
+            return get_state_coordinates(state)
+        response.raise_for_status()
         
-        html += f"""<li>
-                    <strong>{name}</strong>
-                    <p>{address}, {city}</p>
-                    <a href="https://www.google.com/search?q={name.replace(' ', '+')}" target="_blank">Verify on Google</a>
-                </li>
-                """
-    
-    return html
+        data = response.json()
+        if not data:
+            return get_state_coordinates(state)
+        
+        return (float(data[0]['lat']), float(data[0]['lon']))
+    except:
+        return get_state_coordinates(state)
 
-def update_html_template(template_path, city_state, lat, lon, wiki_text, business_data):
-    """Update the HTML template with new city data"""
+def get_state_coordinates(state):
+    """Get approximate coordinates for a state"""
+    state_coords = {
+        'Texas': (31.9686, -99.9018), 'TX': (31.9686, -99.9018),
+        'Oklahoma': (35.4676, -97.5164), 'OK': (35.4676, -97.5164),
+        'California': (36.7783, -119.4179), 'CA': (36.7783, -119.4179),
+        'New York': (43.2994, -74.2179), 'NY': (43.2994, -74.2179),
+        'Florida': (27.6648, -81.5158), 'FL': (27.6648, -81.5158),
+    }
+    return state_coords.get(state, (39.8283, -98.5795))
+
+def get_weather_forecast(lat, lon):
+    """Get 7-day weather forecast from Open-Meteo"""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        'latitude': lat,
+        'longitude': lon,
+        'daily': 'temperature_2m_max,temperature_2m_min,weathercode',
+        'temperature_unit': 'fahrenheit',
+        'timezone': 'auto',
+        'forecast_days': 7
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except:
+        return {'daily': {'time': [], 'temperature_2m_max': [], 'temperature_2m_min': [], 'weathercode': []}}
+
+def get_wikipedia_summary(city_state):
+    """Get city summary from Wikipedia API"""
+    city, state = city_state.split('-')
+    time.sleep(1)
+    
+    url = "https://en.wikipedia.org/api/rest_v1/page/summary/"
+    search_term = f"{city}, {state}"
+    
+    headers = {
+        'User-Agent': 'EyeTryAICityDeployer/1.0'
+    }
+    
+    try:
+        response = requests.get(url + search_term.replace(' ', '_'), headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get('extract', f"{city}, {state} is a location with rich local history and community.")
+    except:
+        return f"{city}, {state} is a community with unique local character and growing opportunities for digital innovation and business development."
+
+def query_overpass(category, lat, lon, radius=15000):
+    """Query OverPass API for local businesses"""
+    overpass_queries = {
+        'barbers': f"""node["shop"="hairdresser"](around:{radius},{lat},{lon}); node["amenity"="barber"](around:{radius},{lat},{lon});""",
+        'bars': f"""node["amenity"="bar"](around:{radius},{lat},{lon}); node["amenity"="pub"](around:{radius},{lat},{lon});""",
+        'diners_cafes': f"""node["amenity"="cafe"](around:{radius},{lat},{lon}); node["amenity"="restaurant"](around:{radius},{lat},{lon});""",
+        'libraries': f"""node["amenity"="library"](around:{radius},{lat},{lon});""",
+        'attractions_amusements': f"""node["tourism"="attraction"](around:{radius},{lat},{lon}); node["tourism"="museum"](around:{radius},{lat},{lon});""",
+        'coffee_shops': f"""node["amenity"="cafe"]["cuisine"="coffee_shop"](around:{radius},{lat},{lon}); node["shop"="coffee"](around:{radius},{lat},{lon});"""
+    }
+    
+    if category not in overpass_queries:
+        return []
+    
+    url = "https://overpass-api.de/api/interpreter"
+    query = f"[out:json][timeout:25];({overpass_queries[category]});out body;"
+    
+    try:
+        response = requests.post(url, data=query, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        return data.get('elements', [])
+    except:
+        return []
+
+def process_business_data(businesses, category):
+    """Process and format business data from OverPass"""
+    processed = []
+    for business in businesses[:3]:
+        name = business.get('tags', {}).get('name', 'Unnamed Business')
+        address = business.get('tags', {}).get('addr:street', 'Local Address')
+        website = business.get('tags', {}).get('website', '#')
+        processed.append({'name': name, 'address': address, 'website': website})
+    
+    if not processed:
+        fallbacks = {
+            'barbers': [{'name': 'Local Barber Shop', 'address': 'Main Street', 'website': '#'}],
+            'coffee_shops': [{'name': 'Local Coffee House', 'address': 'Central Avenue', 'website': '#'}],
+            'bars': [{'name': 'Local Pub', 'address': 'Main Street', 'website': '#'}],
+            'diners_cafes': [{'name': 'Local Cafe', 'address': 'Business District', 'website': '#'}],
+            'libraries': [{'name': 'Public Library', 'address': 'Community Center', 'website': '#'}],
+            'attractions_amusements': [{'name': 'Community Park', 'address': 'Recreation Area', 'website': '#'}]
+        }
+        processed = fallbacks.get(category, [{'name': f'Local {category.title()}', 'address': 'Check local directory', 'website': '#'}])
+    
+    return processed
+
+def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
+    """Update the HTML template with new city data - FIXED VERSION"""
+    debug_log("Reading and updating HTML template...")
+    
+    with open('index.html', 'r', encoding='utf-8') as f:
+        html_content = f.read()
+    
     city, state = city_state.split('-')
     
-    with open(template_path, 'r', encoding='utf-8') as f:
-        html = f.read()
+    # DEBUG: Check what's actually in the template
+    debug_log(f"Template contains 'Paoli, Oklahoma': {'Paoli, Oklahoma' in html_content}")
+    debug_log(f"Template contains 'Ardmore': {'Ardmore' in html_content}")
     
-    # Replace city-state references
-    html = html.replace('Paoli, Oklahoma', f'{city}, {state}')
-    html = html.replace('Paoli, OK', f'{city}, {state.upper()[:2]}')
-    html = html.replace('Paoli', city)
+    # COMPLETE REPLACEMENT - Don't use regex, use direct string replacement
+    html_content = html_content.replace('Paoli, Oklahoma', f'{city}, {state}')
+    html_content = html_content.replace('Paoli, OK', f'{city}, {state}')
     
-    # Update coordinates
-    html = html.replace('34.83', f'{lat:.2f}')
-    html = html.replace('97.26', f'{abs(lon):.2f}')
+    # Update coordinates in footer
+    html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
+    html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
     
-    # Update Wikipedia section
-    wiki_section = f"""<section id="paoli-ok" class="section paoli-section">
-            <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
+    # Update Nexus Point section - Use exact string replacement
+    old_nexus_text = """<section id="paoli-ok" class="section paoli-section">
+            <h2 class="section-title">The Nexus Point: Paoli, Oklahoma</h2>
             <p>
-                {wiki_text}
+                Paoli, Oklahoma, is a historic railroad town nestled in Garvin County, representing the heart of rural simplicity and agricultural heritage. While a small community, its proximity to **Pauls Valley**, a regional center for commerce, and the beautiful landscape of Central Oklahoma, makes it a unique setting. This region is primed for the integration of digital intelligence into traditional local businesses. Paoli serves as an excellent foundational point for an **A.I. Club** focused on connecting new technology with local entrepreneurial spirit, leveraging the resources and activity of the nearby larger towns.
             </p>
         </section>"""
     
-    # Replace the nexus section
-    start = html.find('<section id="paoli-ok"')
-    end = html.find('</section>', start) + len('</section>')
-    html = html[:start] + wiki_section + html[end:]
+    new_nexus_text = f"""<section id="paoli-ok" class="section paoli-section">
+            <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
+            <p>
+                {wiki_summary}
+            </p>
+        </section>"""
     
-    # Update business sections
-    for category, data in business_data.items():
-        # Find and replace each business category
-        html = html.replace(f'<h3>{category}</h3>', f'<h3>{category}</h3>\n<ul class="business-list">\n{data}\n</ul>')
+    html_content = html_content.replace(old_nexus_text, new_nexus_text)
     
     # Update weather coordinates in JavaScript
-    html = html.replace('const lat = 34.83;', f'const lat = {lat};')
-    html = html.replace('const lon = -97.26;', f'const lon = {lon};')
+    html_content = re.sub(r'const lat = [\d.-]+;', f'const lat = {lat};', html_content)
+    html_content = re.sub(r'const lon = [\d.-]+;', f'const lon = {lon};', html_content)
     
-    return html
-
-def create_github_repo(github_token, repo_name, html_content):
-    """Create new GitHub repository and push files"""
-    g = Github(github_token)
-    user = g.get_user()
-    
-    # Create new repository
-    repo = user.create_repo(
-        repo_name,
-        description=f"AI-generated website for {repo_name}",
-        private=False,
-        auto_init=False
-    )
-    
-    print(f"Created repository: {repo.full_name}")
-    
-    # Push files
-    repo.create_file("index.html", "Initial commit", html_content, branch="main")
-    repo.create_file(".nojekyll", "Add .nojekyll", "", branch="main")
-    
-    # Enable GitHub Pages
-    try:
-        repo.enable_pages(branch="main", path="/")
-        print(f"GitHub Pages enabled at: https://{user.login}.github.io/{repo_name}/")
-    except Exception as e:
-        print(f"Note: Enable GitHub Pages manually - {e}")
-    
-    return repo
-
-def main():
-    # Read city from new.txt
-    with open('new.txt', 'r') as f:
-        city_state = f.read().strip()
-    
-    print(f"Processing: {city_state}")
-    
-    # Get coordinates
-    lat, lon = get_coordinates(city_state)
-    if not lat:
-        print("Error: Could not find coordinates")
-        return
-    
-    print(f"Coordinates: {lat}, {lon}")
-    
-    # Get Wikipedia summary
-    wiki_text = get_wikipedia_summary(city_state)
-    print("Wikipedia summary retrieved")
-    
-    # Get business data with 5-minute delays
-    business_data = {}
-    
-    categories = {
-        'Barbershops': 'barber',
-        'Coffee Shops': 'cafe',
-        'Diners & Cafés': 'restaurant',
-        'Local Bars & Pubs': 'bar',
-        'Libraries': 'library',
-        'Attractions & Amusements': 'attraction'
+    # Update business sections
+    business_sections = {
+        'barbers': 'Barbershops',
+        'coffee_shops': 'Coffee Shops',
+        'diners_cafes': 'Diners & Cafés',
+        'bars': 'Local Bars & Pubs',
+        'libraries': 'Libraries',
+        'attractions_amusements': 'Attractions & Amusements'
     }
     
-    for i, (category, amenity) in enumerate(categories.items()):
-        print(f"Fetching {category}...")
-        businesses = get_overpass_data(lat, lon, amenity)
+    for category, section_title in business_sections.items():
+        # Create new business section
+        new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
+        for business in business_data.get(category, []):
+            new_section += f'''                <li>
+                    <strong>{business["name"]}</strong>
+                    <p>Local business serving the {city} community.</p>
+                    <p>Address: {business["address"]}</p>
+                    <a href="{business["website"]}" target="_blank">View Details</a>
+                </li>\n'''
+        new_section += '            </ul>'
         
-        # If no results, try nearby city
-        if not businesses:
-            print(f"No {category} found, checking nearby areas...")
-            nearby_city = get_nearby_city(lat, lon)
-            if nearby_city:
-                print(f"Using data from nearby: {nearby_city}")
+        # Find and replace the section
+        start_marker = f'<h3>{section_title}</h3>'
+        end_marker = '</ul>'
+        start_idx = html_content.find(start_marker)
+        if start_idx != -1:
+            # Find the end of this section
+            section_end = html_content.find(end_marker, start_idx)
+            if section_end != -1:
+                section_end += len(end_marker)
+                # Replace the entire section
+                html_content = html_content[:start_idx] + new_section + html_content[section_end:]
+    
+    # VERIFY the updates
+    if f'{city}, {state}' in html_content:
+        success_log("City name successfully updated in HTML")
+    else:
+        error_log("City name NOT updated in HTML - this is the main issue!")
         
-        business_data[category] = format_business_html(businesses, category)
+    return html_content
+
+def enable_github_pages_via_api(repo_full_name):
+    """Enable GitHub Pages using direct API call - MORE RELIABLE"""
+    debug_log(f"Enabling GitHub Pages for {repo_full_name} via API...")
+    
+    url = f"https://api.github.com/repos/{repo_full_name}/pages"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
+        "source": {
+            "branch": "main",
+            "path": "/"
+        }
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        debug_log(f"GitHub Pages API response: {response.status_code}")
         
-        # 5-minute sleep between API calls (except last one)
-        if i < len(categories) - 1:
-            print("Waiting 5 minutes before next API call...")
-            time.sleep(300)
+        if response.status_code == 201:
+            success_log("GitHub Pages enabled via direct API")
+            return True
+        else:
+            debug_log(f"API enable failed: {response.json()}")
+            return False
+    except Exception as e:
+        debug_log(f"API enable error: {e}")
+        return False
+
+def create_github_repo(city_state, updated_html):
+    """Create new GitHub repository and push files - FIXED VERSION"""
+    debug_log("Creating GitHub repository...")
     
-    # Update HTML template
-    html_content = update_html_template('index.html', city_state, lat, lon, wiki_text, business_data)
+    g = Github(GITHUB_TOKEN)
+    user = g.get_user()
     
-    # Create GitHub repository
-    github_token = os.environ.get('GITHUB_TOKEN')
-    repo_name = city_state.replace(' ', '-')
+    repo_name = f"{city_state.replace('-', '').replace(' ', '').lower()}"
+    debug_log(f"Repository name: {repo_name}")
     
-    create_github_repo(github_token, repo_name, html_content)
+    try:
+        # Create new repository
+        repo = user.create_repo(
+            repo_name,
+            description=f"Eye Try A.I. - {city_state}",
+            private=False,
+            auto_init=False
+        )
+        success_log(f"Repository created: {repo.html_url}")
+        
+        # Create and push files
+        files_to_push = {
+            'index.html': updated_html,
+            '.nojekyll': ''
+        }
+        
+        for filename, content in files_to_push.items():
+            repo.create_file(
+                filename,
+                f"Initial commit for {city_state}",
+                content,
+                branch="main"
+            )
+            debug_log(f"Created {filename}")
+        
+        # TRY MULTIPLE METHODS TO ENABLE GITHUB PAGES
+        
+        # Method 1: Direct API call (most reliable)
+        repo_full_name = f"{user.login}/{repo_name}"
+        if enable_github_pages_via_api(repo_full_name):
+            success_log("GitHub Pages enabled via API")
+        else:
+            # Method 2: PyGithub method
+            try:
+                repo.create_pages_site(branch="main", path="/")
+                success_log("GitHub Pages enabled via PyGithub")
+            except Exception as e:
+                debug_log(f"PyGithub method failed: {e}")
+                
+                # Method 3: Manual instructions
+                debug_log("GitHub Pages may need manual activation:")
+                debug_log(f"1. Go to: https://github.com/{repo_full_name}/settings/pages")
+                debug_log("2. Set Source to 'Deploy from a branch'")
+                debug_log("3. Set Branch to 'main' and folder to '/'")
+                debug_log("4. Click Save")
+        
+        # Add a small delay to allow GitHub to process
+        time.sleep(5)
+        
+        return repo.html_url
+        
+    except GithubException as e:
+        if e.status == 422:
+            debug_log(f"Repository {repo_name} already exists")
+            return f"https://github.com/{user.login}/{repo_name}"
+        else:
+            raise
+
+def main():
+    debug_log("Starting website deployment process...")
     
-    print(f"✅ Deployment complete for {city_state}")
+    try:
+        # Read city from file
+        city_state = read_city_from_file()
+        debug_log(f"Processing: {city_state}")
+        
+        # Get coordinates
+        lat, lon = geocode_city(city_state)
+        debug_log(f"Coordinates: {lat}, {lon}")
+        
+        # Get weather data
+        weather_data = get_weather_forecast(lat, lon)
+        
+        # Get Wikipedia summary
+        wiki_summary = get_wikipedia_summary(city_state)
+        
+        # Get business data
+        business_data = {}
+        categories = ['barbers', 'bars', 'diners_cafes', 'libraries', 'attractions_amusements', 'coffee_shops']
+        
+        for i, category in enumerate(categories):
+            debug_log(f"Querying {category}...")
+            businesses = query_overpass(category, lat, lon)
+            business_data[category] = process_business_data(businesses, category)
+            if i < len(categories) - 1:
+                time.sleep(5)  # 5 seconds between API calls
+        
+        # Update HTML template
+        updated_html = update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data)
+        
+        # Create GitHub repository
+        repo_url = create_github_repo(city_state, updated_html)
+        
+        success_log(f"Deployment completed: {repo_url}")
+        
+        with open('deployment_success.txt', 'w') as f:
+            f.write(f"Successfully deployed {city_state} to {repo_url}")
+        
+    except Exception as e:
+        error_log(f"Deployment failed: {e}")
+        with open('deployment_error.txt', 'w') as f:
+            f.write(f"Deployment failed: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     main()

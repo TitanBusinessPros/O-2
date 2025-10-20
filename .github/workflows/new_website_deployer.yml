@@ -27,6 +27,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests PyGithub
         
+    - name: Debug - List files in repository
+      run: |
+        echo "=== Current directory structure ==="
+        ls -la
+        echo "=== new.txt content ==="
+        cat new.txt || echo "new.txt not found"
+        echo "=== index.html exists ==="
+        ls -la index.html || echo "index.html not found"
+        
     - name: Validate new.txt file
       run: |
         if [ ! -f "new.txt" ]; then
@@ -44,10 +53,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.NEW7 }}
       run: |
+        echo "=== Starting Python script ==="
         python new_website_deployer.py
+        echo "=== Python script completed ==="
+        
+    - name: Debug - Check for status files
+      run: |
+        echo "=== Checking for status files ==="
+        ls -la deployment_success.txt 2>/dev/null && echo "✅ deployment_success.txt exists" || echo "❌ deployment_success.txt not found"
+        ls -la deployment_error.txt 2>/dev/null && echo "✅ deployment_error.txt exists" || echo "❌ deployment_error.txt not found"
         
     - name: Check deployment status
       run: |
+        echo "=== Checking deployment status ==="
         if [ -f "deployment_success.txt" ]; then
           echo "✅ Deployment successful!"
           cat deployment_success.txt
@@ -55,11 +73,14 @@ jobs:
           echo "❌ Deployment failed!"
           cat deployment_error.txt
           exit 1
-        else:
-          echo "⚠️ Unknown deployment status"
+        else
+          echo "⚠️ Unknown deployment status - no status files found"
           exit 1
+        fi
           
     - name: Cleanup status files
       if: always()
       run: |
+        echo "=== Cleaning up status files ==="
         rm -f deployment_success.txt deployment_error.txt
+        echo "✅ Cleanup completed"

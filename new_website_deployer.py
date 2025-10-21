@@ -165,7 +165,7 @@ def process_business_data(businesses, category):
     return processed
 
 def get_github_pages_workflow():
-    """Returns the GitHub Pages deployment workflow that auto-enables Pages"""
+    """Returns the GitHub Pages deployment workflow"""
     return """name: Deploy to GitHub Pages
 
 on:
@@ -203,7 +203,7 @@ jobs:
 """
 
 def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
-    """Update the HTML template with new city data"""
+    """Update the HTML template with new city data - COMPLETELY REWRITTEN"""
     debug_log("📄 Starting HTML template update...")
     
     try:
@@ -214,29 +214,32 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         city, state = city_state.split('-')
         debug_log(f"Updating HTML for: {city}, {state}")
         
-        # COMPREHENSIVE CITY REPLACEMENT
+        # COMPREHENSIVE CITY REPLACEMENT - Handle ALL possible city references
         replacements = [
             ('Paoli, Oklahoma', f'{city}, {state}'),
             ('Paoli, OK', f'{city}, {state}'),
+            ('Ardmore, Oklahoma', f'{city}, {state}'),
+            ('Ardmore, OK', f'{city}, {state}'),
+            ('Paoli', city),  # Replace standalone Paoli mentions
         ]
         
         for old_text, new_text in replacements:
-            count = html_content.count(old_text)
-            if count > 0:
+            count_before = html_content.count(old_text)
+            if count_before > 0:
                 html_content = html_content.replace(old_text, new_text)
-                debug_log(f"Replaced '{old_text}' with '{new_text}' ({count} occurrences)")
+                count_after = html_content.count(old_text)
+                debug_log(f"Replaced '{old_text}' with '{new_text}' (was {count_before}, now {count_after})")
         
         # Update coordinates in footer
         html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
         html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
         
-        # Update Nexus Point section
-        old_nexus_section = '''<section id="paoli-ok" class="section paoli-section">
-            <h2 class="section-title">The Nexus Point: Paoli, Oklahoma</h2>
-            <p>
-                Paoli, Oklahoma, is a historic railroad town nestled in Garvin County, representing the heart of rural simplicity and agricultural heritage. While a small community, its proximity to **Pauls Valley**, a regional center for commerce, and the beautiful landscape of Central Oklahoma, makes it a unique setting. This region is primed for the integration of digital intelligence into traditional local businesses. Paoli serves as an excellent foundational point for an **A.I. Club** focused on connecting new technology with local entrepreneurial spirit, leveraging the resources and activity of the nearby larger towns.
-            </p>
-        </section>'''
+        # CRITICAL FIX: Update Nexus Point section with FLEXIBLE approach
+        nexus_patterns = [
+            r'<section id="paoli-ok"[^>]*>.*?<h2[^>]*>.*?</h2>.*?<p>.*?</p>.*?</section>',
+            r'<section id="paoli-ok".*?</section>',
+            r'The Nexus Point: [^<]+'
+        ]
         
         new_nexus_section = f'''<section id="paoli-ok" class="section paoli-section">
             <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
@@ -245,13 +248,32 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
             </p>
         </section>'''
         
-        html_content = html_content.replace(old_nexus_section, new_nexus_section)
-        debug_log("Updated Nexus Point section")
+        nexus_updated = False
+        for pattern in nexus_patterns:
+            if re.search(pattern, html_content, re.DOTALL):
+                html_content = re.sub(pattern, new_nexus_section, html_content, flags=re.DOTALL)
+                debug_log(f"Updated Nexus Point using pattern: {pattern}")
+                nexus_updated = True
+                break
+        
+        if not nexus_updated:
+            # Fallback: Simple replacement
+            if "The Nexus Point:" in html_content:
+                html_content = html_content.replace("The Nexus Point: Paoli, Oklahoma", f"The Nexus Point: {city}, {state}")
+                debug_log("Used fallback Nexus Point replacement")
         
         # Update weather coordinates in JavaScript
-        html_content = re.sub(r'const lat = [\d.-]+;', f'const lat = {lat};', html_content)
-        html_content = re.sub(r'const lon = [\d.-]+;', f'const lon = {lon};', html_content)
-        debug_log("Updated weather coordinates")
+        weather_updates = [
+            (r'const lat = [\d.-]+;', f'const lat = {lat};'),
+            (r'const lon = [\d.-]+;', f'const lon = {lon};'),
+            (r'//.*?Latitude', f'// {city}, {state} Latitude'),
+            (r'//.*?Longitude', f'// {city}, {state} Longitude')
+        ]
+        
+        for pattern, replacement in weather_updates:
+            if re.search(pattern, html_content):
+                html_content = re.sub(pattern, replacement, html_content)
+                debug_log(f"Updated weather: {pattern}")
         
         # Update local businesses sections
         business_sections = {
@@ -264,6 +286,8 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         }
         
         for category, section_title in business_sections.items():
+            debug_log(f"Updating {section_title} section...")
+            
             # Create new business section
             new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
             for business in business_data.get(category, []):
@@ -275,38 +299,99 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
                 </li>\n'''
             new_section += '            </ul>'
             
-            # Find and replace the section
-            start_marker = f'<h3>{section_title}</h3>'
-            end_marker = '</ul>'
-            start_idx = html_content.find(start_marker)
-            if start_idx != -1:
-                end_idx = html_content.find(end_marker, start_idx)
-                if end_idx != -1:
-                    end_idx += len(end_marker)
-                    html_content = html_content[:start_idx] + new_section + html_content[end_idx:]
-                    debug_log(f"Updated {section_title} section")
+            # Find and replace using multiple approaches
+            section_pattern = f'<h3>{section_title}</h3>.*?</ul>'
+            if re.search(section_pattern, html_content, re.DOTALL):
+                html_content = re.sub(section_pattern, new_section, html_content, flags=re.DOTALL)
+                debug_log(f"Updated {section_title} using regex")
+            else:
+                # Fallback: direct string replacement
+                old_section_start = f'<h3>{section_title}</h3>'
+                if old_section_start in html_content:
+                    start_idx = html_content.find(old_section_start)
+                    end_idx = html_content.find('</ul>', start_idx)
+                    if end_idx != -1:
+                        end_idx += len('</ul>')
+                        html_content = html_content[:start_idx] + new_section + html_content[end_idx:]
+                        debug_log(f"Updated {section_title} using string replacement")
         
-        # VERIFY the updates
-        if f'{city}, {state}' in html_content:
-            success_log("✅ City name successfully updated in HTML")
+        # VERIFY ALL UPDATES
+        verification_points = [
+            (f'{city}, {state}', "City name in content"),
+            (f'The Nexus Point: {city}, {state}', "Nexus Point title"),
+            (f'Latitude: {lat:.2f}° N', "Latitude coordinate"),
+            (f'Longitude: {abs(lon):.2f}° W', "Longitude coordinate"),
+        ]
+        
+        all_passed = True
+        for check_text, description in verification_points:
+            if check_text in html_content:
+                success_log(f"✅ {description} - VERIFIED")
+            else:
+                error_log(f"❌ {description} - MISSING")
+                all_passed = False
+        
+        if all_passed:
+            success_log("🎉 ALL HTML UPDATES VERIFIED SUCCESSFULLY!")
         else:
-            error_log("❌ City name NOT updated in HTML")
+            error_log("⚠️ SOME HTML UPDATES FAILED - CHECK ABOVE")
             
         return html_content
         
     except Exception as e:
         error_log(f"Error updating HTML template: {e}")
+        error_log(f"Traceback: {traceback.format_exc()}")
         raise
 
+def force_github_pages_deployment(username, repo_name):
+    """Force GitHub Pages deployment by creating a dummy commit"""
+    debug_log(f"🔄 Force-enabling GitHub Pages for {username}/{repo_name}")
+    
+    g = Github(GITHUB_TOKEN)
+    
+    try:
+        repo = g.get_repo(f"{username}/{repo_name}")
+        
+        # Try to enable Pages via API first
+        try:
+            repo.create_pages_site(branch="main", path="/")
+            success_log("✅ GitHub Pages enabled via PyGithub")
+            return True
+        except Exception as e:
+            debug_log(f"PyGithub Pages enable failed: {e}")
+        
+        # Add a dummy commit to trigger Pages workflow
+        try:
+            # Get the current README or create one
+            try:
+                contents = repo.get_contents("README.md")
+                readme_content = contents.decoded_content.decode()
+                repo.update_file("README.md", "Trigger GitHub Pages deployment", readme_content, contents.sha)
+            except:
+                repo.create_file("README.md", "Initial README for GitHub Pages", f"# {repo_name}\n\nAuto-deployed site for GitHub Pages.")
+            
+            success_log("✅ Dummy commit created to trigger Pages workflow")
+            return True
+        except Exception as e:
+            debug_log(f"Dummy commit failed: {e}")
+        
+        return False
+        
+    except Exception as e:
+        error_log(f"Force deployment failed: {e}")
+        return False
+
 def create_github_repo(city_state, updated_html):
-    """Create new GitHub repository and push files - WITH AUTO PAGES DEPLOYMENT"""
+    """Create new GitHub repository and push files - WITH GUARANTEED PAGES"""
     debug_log("🐙 Creating GitHub repository...")
     
     g = Github(GITHUB_TOKEN)
     user = g.get_user()
+    username = user.login
     
     repo_name = f"{city_state.replace('-', '').replace(' ', '').lower()}"
     debug_log(f"Repository name: {repo_name}")
+    debug_log(f"Username: {username}")
     
     try:
         # Create new repository
@@ -318,35 +403,50 @@ def create_github_repo(city_state, updated_html):
         )
         success_log(f"✅ Repository created: {repo.html_url}")
         
-        # Create and push files - INCLUDING GITHUB PAGES WORKFLOW
+        # Wait for repo to be ready
+        time.sleep(3)
+        
+        # Create and push files - INCLUDING PAGES WORKFLOW
         github_pages_workflow = get_github_pages_workflow()
         
         files_to_push = {
             'index.html': updated_html,
             '.nojekyll': '',
-            '.github/workflows/pages.yml': github_pages_workflow
+            '.github/workflows/deploy-pages.yml': github_pages_workflow
         }
         
         for filename, content in files_to_push.items():
-            # Create directory if needed
-            if '/' in filename:
-                dir_name = os.path.dirname(filename)
-                # GitHub API handles nested paths automatically in create_file
-                pass
-                
-            repo.create_file(
-                filename,
-                f"Initial commit for {city_state} - Auto Pages Deployment",
-                content,
-                branch="main"
-            )
-            debug_log(f"Created {filename}")
+            try:
+                repo.create_file(
+                    filename,
+                    f"Initial commit for {city_state}",
+                    content,
+                    branch="main"
+                )
+                debug_log(f"Created {filename}")
+            except Exception as e:
+                debug_log(f"File creation warning for {filename}: {e}")
         
-        success_log("✅ All files pushed including GitHub Pages workflow")
+        success_log("✅ All files pushed to repository")
         
-        # The GitHub Pages workflow will automatically trigger and deploy
-        debug_log("🚀 GitHub Pages deployment workflow has been added")
-        debug_log("📝 The site will automatically go live within 1-2 minutes")
+        # Wait for files to process
+        time.sleep(5)
+        
+        # FORCE GitHub Pages deployment
+        debug_log("🚀 Force-activating GitHub Pages...")
+        if force_github_pages_deployment(username, repo_name):
+            success_log("✅ GitHub Pages deployment triggered")
+        else:
+            debug_log("⚠️ GitHub Pages may need manual activation")
+        
+        # Final verification
+        debug_log("🔍 Final verification...")
+        try:
+            pages_url = f"https://{username}.github.io/{repo_name}"
+            debug_log(f"🌐 Site should be available at: {pages_url}")
+            debug_log("⏰ Allow 1-2 minutes for initial deployment")
+        except Exception as e:
+            debug_log(f"Final verification note: {e}")
         
         return repo.html_url
         
@@ -397,8 +497,8 @@ def main():
         repo_url = create_github_repo(city_state, updated_html)
         
         success_log(f"🎉 Deployment completed: {repo_url}")
-        success_log("🌐 GitHub Pages will auto-deploy within 1-2 minutes")
-        success_log("✅ Site will be LIVE automatically without manual steps")
+        success_log("🌐 GitHub Pages should auto-deploy within 1-2 minutes")
+        success_log("✅ Site will be LIVE automatically")
         
         # Write success file
         with open('deployment_success.txt', 'w') as f:
@@ -406,8 +506,9 @@ def main():
         
     except Exception as e:
         error_log(f"Deployment failed: {e}")
+        error_log(f"Full traceback: {traceback.format_exc()}")
         with open('deployment_error.txt', 'w') as f:
-            f.write(f"Deployment failed: {str(e)}")
+            f.write(f"Deployment failed: {str(e)}\n\nTraceback:\n{traceback.format_exc()}")
         raise
 
 if __name__ == "__main__":

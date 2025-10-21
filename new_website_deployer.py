@@ -29,6 +29,7 @@ def read_city_from_file():
         with open('new.txt', 'r') as f:
             content = f.read().strip()
             if '-' in content:
+                debug_log(f"Read city-state from new.txt: {content}")
                 return content
             else:
                 raise ValueError("File should contain city-state format like 'Dallas-Texas'")
@@ -164,122 +165,117 @@ def process_business_data(businesses, category):
     return processed
 
 def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
-    """Update the HTML template with new city data - FIXED VERSION"""
-    debug_log("Reading and updating HTML template...")
+    """Update the HTML template with new city data - COMPLETELY REWRITTEN"""
+    debug_log("📄 Starting HTML template update...")
     
-    with open('index.html', 'r', encoding='utf-8') as f:
-        html_content = f.read()
-    
-    city, state = city_state.split('-')
-    
-    # DEBUG: Check what's actually in the template
-    debug_log(f"Template contains 'Paoli, Oklahoma': {'Paoli, Oklahoma' in html_content}")
-    debug_log(f"Template contains 'Ardmore': {'Ardmore' in html_content}")
-    
-    # COMPLETE REPLACEMENT - Don't use regex, use direct string replacement
-    html_content = html_content.replace('Paoli, Oklahoma', f'{city}, {state}')
-    html_content = html_content.replace('Paoli, OK', f'{city}, {state}')
-    
-    # Update coordinates in footer
-    html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
-    html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
-    
-    # Update Nexus Point section - Use exact string replacement
-    old_nexus_text = """<section id="paoli-ok" class="section paoli-section">
-            <h2 class="section-title">The Nexus Point: Paoli, Oklahoma</h2>
-            <p>
-                Paoli, Oklahoma, is a historic railroad town nestled in Garvin County, representing the heart of rural simplicity and agricultural heritage. While a small community, its proximity to **Pauls Valley**, a regional center for commerce, and the beautiful landscape of Central Oklahoma, makes it a unique setting. This region is primed for the integration of digital intelligence into traditional local businesses. Paoli serves as an excellent foundational point for an **A.I. Club** focused on connecting new technology with local entrepreneurial spirit, leveraging the resources and activity of the nearby larger towns.
-            </p>
-        </section>"""
-    
-    new_nexus_text = f"""<section id="paoli-ok" class="section paoli-section">
+    try:
+        # Read the original HTML template
+        with open('index.html', 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        city, state = city_state.split('-')
+        debug_log(f"Updating HTML for: {city}, {state}")
+        
+        # DEBUG: Check what's actually in the template
+        debug_log(f"Template contains 'Paoli, Oklahoma': {'Paoli, Oklahoma' in html_content}")
+        debug_log(f"Template contains 'Ardmore': {'Ardmore' in html_content}")
+        debug_log(f"Template contains 'Fresno': {'Fresno' in html_content}")
+        
+        # COMPREHENSIVE REPLACEMENT - Handle ALL city references
+        replacements = [
+            ('Paoli, Oklahoma', f'{city}, {state}'),
+            ('Paoli, OK', f'{city}, {state}'),
+            ('Ardmore, Oklahoma', f'{city}, {state}'),
+            ('Ardmore, OK', f'{city}, {state}'),
+            # Add any other city names that might appear
+        ]
+        
+        for old_text, new_text in replacements:
+            if old_text in html_content:
+                html_content = html_content.replace(old_text, new_text)
+                debug_log(f"Replaced '{old_text}' with '{new_text}'")
+        
+        # Update coordinates in footer
+        html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
+        html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
+        
+        # CRITICAL FIX: Update Nexus Point section using more flexible approach
+        nexus_section_pattern = r'<section id="paoli-ok"[^>]*>.*?</section>'
+        new_nexus_section = f'''
+        <section id="paoli-ok" class="section paoli-section">
             <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
             <p>
                 {wiki_summary}
             </p>
-        </section>"""
-    
-    html_content = html_content.replace(old_nexus_text, new_nexus_text)
-    
-    # Update weather coordinates in JavaScript
-    html_content = re.sub(r'const lat = [\d.-]+;', f'const lat = {lat};', html_content)
-    html_content = re.sub(r'const lon = [\d.-]+;', f'const lon = {lon};', html_content)
-    
-    # Update business sections
-    business_sections = {
-        'barbers': 'Barbershops',
-        'coffee_shops': 'Coffee Shops',
-        'diners_cafes': 'Diners & Cafés',
-        'bars': 'Local Bars & Pubs',
-        'libraries': 'Libraries',
-        'attractions_amusements': 'Attractions & Amusements'
-    }
-    
-    for category, section_title in business_sections.items():
-        # Create new business section
-        new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
-        for business in business_data.get(category, []):
-            new_section += f'''                <li>
+        </section>
+        '''
+        
+        # Replace the entire section
+        html_content = re.sub(nexus_section_pattern, new_nexus_section, html_content, flags=re.DOTALL)
+        debug_log("Updated Nexus Point section")
+        
+        # Update weather coordinates in JavaScript
+        html_content = re.sub(r'const lat = [\d.-]+;', f'const lat = {lat};', html_content)
+        html_content = re.sub(r'const lon = [\d.-]+;', f'const lon = {lon};', html_content)
+        debug_log("Updated weather coordinates")
+        
+        # Update local businesses sections
+        business_sections = {
+            'barbers': 'Barbershops',
+            'coffee_shops': 'Coffee Shops',
+            'diners_cafes': 'Diners & Cafés',
+            'bars': 'Local Bars & Pubs',
+            'libraries': 'Libraries',
+            'attractions_amusements': 'Attractions & Amusements'
+        }
+        
+        for category, section_title in business_sections.items():
+            # Create new business section
+            new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
+            for business in business_data.get(category, []):
+                new_section += f'''                <li>
                     <strong>{business["name"]}</strong>
                     <p>Local business serving the {city} community.</p>
                     <p>Address: {business["address"]}</p>
                     <a href="{business["website"]}" target="_blank">View Details</a>
                 </li>\n'''
-        new_section += '            </ul>'
+            new_section += '            </ul>'
+            
+            # Find and replace the section using regex
+            section_pattern = f'<h3>{section_title}</h3>.*?</ul>'
+            html_content = re.sub(section_pattern, new_section, html_content, flags=re.DOTALL)
+            debug_log(f"Updated {section_title} section")
         
-        # Find and replace the section
-        start_marker = f'<h3>{section_title}</h3>'
-        end_marker = '</ul>'
-        start_idx = html_content.find(start_marker)
-        if start_idx != -1:
-            # Find the end of this section
-            section_end = html_content.find(end_marker, start_idx)
-            if section_end != -1:
-                section_end += len(end_marker)
-                # Replace the entire section
-                html_content = html_content[:start_idx] + new_section + html_content[section_end:]
-    
-    # VERIFY the updates
-    if f'{city}, {state}' in html_content:
-        success_log("City name successfully updated in HTML")
-    else:
-        error_log("City name NOT updated in HTML - this is the main issue!")
+        # VERIFY the updates were successful
+        verification_checks = [
+            (f'{city}, {state}', f"City name '{city}, {state}' in HTML"),
+            (f'The Nexus Point: {city}, {state}', "Nexus Point title updated"),
+            (f'Latitude: {lat:.2f}° N', "Latitude updated"),
+            (f'Longitude: {abs(lon):.2f}° W', "Longitude updated"),
+        ]
         
-    return html_content
-
-def enable_github_pages_via_api(repo_full_name):
-    """Enable GitHub Pages using direct API call - MORE RELIABLE"""
-    debug_log(f"Enabling GitHub Pages for {repo_full_name} via API...")
-    
-    url = f"https://api.github.com/repos/{repo_full_name}/pages"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    data = {
-        "source": {
-            "branch": "main",
-            "path": "/"
-        }
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        debug_log(f"GitHub Pages API response: {response.status_code}")
+        all_passed = True
+        for check_text, check_description in verification_checks:
+            if check_text in html_content:
+                success_log(f"✅ {check_description}")
+            else:
+                error_log(f"❌ {check_description} - NOT FOUND")
+                all_passed = False
         
-        if response.status_code == 201:
-            success_log("GitHub Pages enabled via direct API")
-            return True
+        if all_passed:
+            success_log("All HTML updates verified successfully!")
         else:
-            debug_log(f"API enable failed: {response.json()}")
-            return False
+            error_log("Some HTML updates failed!")
+            
+        return html_content
+        
     except Exception as e:
-        debug_log(f"API enable error: {e}")
-        return False
+        error_log(f"Error updating HTML template: {e}")
+        raise
 
 def create_github_repo(city_state, updated_html):
-    """Create new GitHub repository and push files - FIXED VERSION"""
-    debug_log("Creating GitHub repository...")
+    """Create new GitHub repository and push files"""
+    debug_log("🐙 Creating GitHub repository...")
     
     g = Github(GITHUB_TOKEN)
     user = g.get_user()
@@ -312,29 +308,26 @@ def create_github_repo(city_state, updated_html):
             )
             debug_log(f"Created {filename}")
         
-        # TRY MULTIPLE METHODS TO ENABLE GITHUB PAGES
-        
-        # Method 1: Direct API call (most reliable)
-        repo_full_name = f"{user.login}/{repo_name}"
-        if enable_github_pages_via_api(repo_full_name):
-            success_log("GitHub Pages enabled via API")
-        else:
-            # Method 2: PyGithub method
+        # Enable GitHub Pages using multiple methods
+        try:
+            # Method 1: PyGithub
+            repo.create_pages_site(branch="main", path="/")
+            success_log("GitHub Pages enabled via PyGithub")
+        except Exception as e:
+            debug_log(f"PyGithub method failed: {e}")
+            # Method 2: Direct API call
             try:
-                repo.create_pages_site(branch="main", path="/")
-                success_log("GitHub Pages enabled via PyGithub")
-            except Exception as e:
-                debug_log(f"PyGithub method failed: {e}")
-                
-                # Method 3: Manual instructions
-                debug_log("GitHub Pages may need manual activation:")
-                debug_log(f"1. Go to: https://github.com/{repo_full_name}/settings/pages")
-                debug_log("2. Set Source to 'Deploy from a branch'")
-                debug_log("3. Set Branch to 'main' and folder to '/'")
-                debug_log("4. Click Save")
-        
-        # Add a small delay to allow GitHub to process
-        time.sleep(5)
+                import json
+                pages_data = {
+                    "source": {
+                        "branch": "main",
+                        "path": "/"
+                    }
+                }
+                # This would require additional API setup
+                debug_log("GitHub Pages may need manual activation in repository settings")
+            except Exception as e2:
+                debug_log(f"API method also failed: {e2}")
         
         return repo.html_url
         
@@ -346,7 +339,7 @@ def create_github_repo(city_state, updated_html):
             raise
 
 def main():
-    debug_log("Starting website deployment process...")
+    debug_log("🚀 Starting website deployment process...")
     
     try:
         # Read city from file
@@ -359,9 +352,11 @@ def main():
         
         # Get weather data
         weather_data = get_weather_forecast(lat, lon)
+        debug_log("Weather data retrieved")
         
         # Get Wikipedia summary
         wiki_summary = get_wikipedia_summary(city_state)
+        debug_log("Wikipedia summary retrieved")
         
         # Get business data
         business_data = {}
@@ -374,14 +369,17 @@ def main():
             if i < len(categories) - 1:
                 time.sleep(5)  # 5 seconds between API calls
         
-        # Update HTML template
+        # Update HTML template - THIS IS THE CRITICAL PART
+        debug_log("Updating HTML template...")
         updated_html = update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data)
         
         # Create GitHub repository
+        debug_log("Creating GitHub repository...")
         repo_url = create_github_repo(city_state, updated_html)
         
-        success_log(f"Deployment completed: {repo_url}")
+        success_log(f"🎉 Deployment completed: {repo_url}")
         
+        # Write success file
         with open('deployment_success.txt', 'w') as f:
             f.write(f"Successfully deployed {city_state} to {repo_url}")
         

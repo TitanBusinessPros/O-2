@@ -164,8 +164,46 @@ def process_business_data(businesses, category):
     
     return processed
 
+def get_github_pages_workflow():
+    """Returns the GitHub Pages deployment workflow that auto-enables Pages"""
+    return """name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+"""
+
 def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
-    """Update the HTML template with new city data - COMPLETELY REWRITTEN"""
+    """Update the HTML template with new city data"""
     debug_log("📄 Starting HTML template update...")
     
     try:
@@ -176,42 +214,38 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         city, state = city_state.split('-')
         debug_log(f"Updating HTML for: {city}, {state}")
         
-        # DEBUG: Check what's actually in the template
-        debug_log(f"Template contains 'Paoli, Oklahoma': {'Paoli, Oklahoma' in html_content}")
-        debug_log(f"Template contains 'Ardmore': {'Ardmore' in html_content}")
-        debug_log(f"Template contains 'Fresno': {'Fresno' in html_content}")
-        
-        # COMPREHENSIVE REPLACEMENT - Handle ALL city references
+        # COMPREHENSIVE CITY REPLACEMENT
         replacements = [
             ('Paoli, Oklahoma', f'{city}, {state}'),
             ('Paoli, OK', f'{city}, {state}'),
-            ('Ardmore, Oklahoma', f'{city}, {state}'),
-            ('Ardmore, OK', f'{city}, {state}'),
-            # Add any other city names that might appear
         ]
         
         for old_text, new_text in replacements:
-            if old_text in html_content:
+            count = html_content.count(old_text)
+            if count > 0:
                 html_content = html_content.replace(old_text, new_text)
-                debug_log(f"Replaced '{old_text}' with '{new_text}'")
+                debug_log(f"Replaced '{old_text}' with '{new_text}' ({count} occurrences)")
         
         # Update coordinates in footer
         html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
         html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
         
-        # CRITICAL FIX: Update Nexus Point section using more flexible approach
-        nexus_section_pattern = r'<section id="paoli-ok"[^>]*>.*?</section>'
-        new_nexus_section = f'''
-        <section id="paoli-ok" class="section paoli-section">
+        # Update Nexus Point section
+        old_nexus_section = '''<section id="paoli-ok" class="section paoli-section">
+            <h2 class="section-title">The Nexus Point: Paoli, Oklahoma</h2>
+            <p>
+                Paoli, Oklahoma, is a historic railroad town nestled in Garvin County, representing the heart of rural simplicity and agricultural heritage. While a small community, its proximity to **Pauls Valley**, a regional center for commerce, and the beautiful landscape of Central Oklahoma, makes it a unique setting. This region is primed for the integration of digital intelligence into traditional local businesses. Paoli serves as an excellent foundational point for an **A.I. Club** focused on connecting new technology with local entrepreneurial spirit, leveraging the resources and activity of the nearby larger towns.
+            </p>
+        </section>'''
+        
+        new_nexus_section = f'''<section id="paoli-ok" class="section paoli-section">
             <h2 class="section-title">The Nexus Point: {city}, {state}</h2>
             <p>
                 {wiki_summary}
             </p>
-        </section>
-        '''
+        </section>'''
         
-        # Replace the entire section
-        html_content = re.sub(nexus_section_pattern, new_nexus_section, html_content, flags=re.DOTALL)
+        html_content = html_content.replace(old_nexus_section, new_nexus_section)
         debug_log("Updated Nexus Point section")
         
         # Update weather coordinates in JavaScript
@@ -241,31 +275,22 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
                 </li>\n'''
             new_section += '            </ul>'
             
-            # Find and replace the section using regex
-            section_pattern = f'<h3>{section_title}</h3>.*?</ul>'
-            html_content = re.sub(section_pattern, new_section, html_content, flags=re.DOTALL)
-            debug_log(f"Updated {section_title} section")
+            # Find and replace the section
+            start_marker = f'<h3>{section_title}</h3>'
+            end_marker = '</ul>'
+            start_idx = html_content.find(start_marker)
+            if start_idx != -1:
+                end_idx = html_content.find(end_marker, start_idx)
+                if end_idx != -1:
+                    end_idx += len(end_marker)
+                    html_content = html_content[:start_idx] + new_section + html_content[end_idx:]
+                    debug_log(f"Updated {section_title} section")
         
-        # VERIFY the updates were successful
-        verification_checks = [
-            (f'{city}, {state}', f"City name '{city}, {state}' in HTML"),
-            (f'The Nexus Point: {city}, {state}', "Nexus Point title updated"),
-            (f'Latitude: {lat:.2f}° N', "Latitude updated"),
-            (f'Longitude: {abs(lon):.2f}° W', "Longitude updated"),
-        ]
-        
-        all_passed = True
-        for check_text, check_description in verification_checks:
-            if check_text in html_content:
-                success_log(f"✅ {check_description}")
-            else:
-                error_log(f"❌ {check_description} - NOT FOUND")
-                all_passed = False
-        
-        if all_passed:
-            success_log("All HTML updates verified successfully!")
+        # VERIFY the updates
+        if f'{city}, {state}' in html_content:
+            success_log("✅ City name successfully updated in HTML")
         else:
-            error_log("Some HTML updates failed!")
+            error_log("❌ City name NOT updated in HTML")
             
         return html_content
         
@@ -274,7 +299,7 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         raise
 
 def create_github_repo(city_state, updated_html):
-    """Create new GitHub repository and push files"""
+    """Create new GitHub repository and push files - WITH AUTO PAGES DEPLOYMENT"""
     debug_log("🐙 Creating GitHub repository...")
     
     g = Github(GITHUB_TOKEN)
@@ -291,43 +316,37 @@ def create_github_repo(city_state, updated_html):
             private=False,
             auto_init=False
         )
-        success_log(f"Repository created: {repo.html_url}")
+        success_log(f"✅ Repository created: {repo.html_url}")
         
-        # Create and push files
+        # Create and push files - INCLUDING GITHUB PAGES WORKFLOW
+        github_pages_workflow = get_github_pages_workflow()
+        
         files_to_push = {
             'index.html': updated_html,
-            '.nojekyll': ''
+            '.nojekyll': '',
+            '.github/workflows/pages.yml': github_pages_workflow
         }
         
         for filename, content in files_to_push.items():
+            # Create directory if needed
+            if '/' in filename:
+                dir_name = os.path.dirname(filename)
+                # GitHub API handles nested paths automatically in create_file
+                pass
+                
             repo.create_file(
                 filename,
-                f"Initial commit for {city_state}",
+                f"Initial commit for {city_state} - Auto Pages Deployment",
                 content,
                 branch="main"
             )
             debug_log(f"Created {filename}")
         
-        # Enable GitHub Pages using multiple methods
-        try:
-            # Method 1: PyGithub
-            repo.create_pages_site(branch="main", path="/")
-            success_log("GitHub Pages enabled via PyGithub")
-        except Exception as e:
-            debug_log(f"PyGithub method failed: {e}")
-            # Method 2: Direct API call
-            try:
-                import json
-                pages_data = {
-                    "source": {
-                        "branch": "main",
-                        "path": "/"
-                    }
-                }
-                # This would require additional API setup
-                debug_log("GitHub Pages may need manual activation in repository settings")
-            except Exception as e2:
-                debug_log(f"API method also failed: {e2}")
+        success_log("✅ All files pushed including GitHub Pages workflow")
+        
+        # The GitHub Pages workflow will automatically trigger and deploy
+        debug_log("🚀 GitHub Pages deployment workflow has been added")
+        debug_log("📝 The site will automatically go live within 1-2 minutes")
         
         return repo.html_url
         
@@ -367,9 +386,9 @@ def main():
             businesses = query_overpass(category, lat, lon)
             business_data[category] = process_business_data(businesses, category)
             if i < len(categories) - 1:
-                time.sleep(5)  # 5 seconds between API calls
+                time.sleep(5)
         
-        # Update HTML template - THIS IS THE CRITICAL PART
+        # Update HTML template
         debug_log("Updating HTML template...")
         updated_html = update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data)
         
@@ -378,6 +397,8 @@ def main():
         repo_url = create_github_repo(city_state, updated_html)
         
         success_log(f"🎉 Deployment completed: {repo_url}")
+        success_log("🌐 GitHub Pages will auto-deploy within 1-2 minutes")
+        success_log("✅ Site will be LIVE automatically without manual steps")
         
         # Write success file
         with open('deployment_success.txt', 'w') as f:

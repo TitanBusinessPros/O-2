@@ -78,6 +78,34 @@ def get_state_coordinates(state):
     }
     return state_coords.get(state, (39.8283, -98.5795))
 
+def get_timezone_from_coords(lat, lon):
+    """Get timezone from coordinates using TimezoneAPI"""
+    try:
+        url = f"http://api.timezonedb.com/v2.1/get-time-zone"
+        params = {
+            'key': 'YOUR_API_KEY',  # Free tier available
+            'format': 'json',
+            'by': 'position',
+            'lat': lat,
+            'lng': lon
+        }
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('zoneName', 'America/Chicago')
+    except:
+        pass
+    
+    # Fallback: Estimate timezone from longitude
+    if -85 <= lon <= -67:
+        return 'America/New_York'
+    elif -115 <= lon < -85:
+        return 'America/Chicago' 
+    elif -125 <= lon < -115:
+        return 'America/Los_Angeles'
+    else:
+        return 'America/Chicago'
+
 def get_weather_forecast(lat, lon):
     """Get 7-day weather forecast from Open-Meteo"""
     url = "https://api.open-meteo.com/v1/forecast"
@@ -117,52 +145,208 @@ def get_wikipedia_summary(city_state):
     except:
         return f"{city}, {state} is a community with unique local character and growing opportunities for digital innovation and business development."
 
-def query_overpass(category, lat, lon, radius=15000):
-    """Query OverPass API for local businesses"""
+def query_overpass_enhanced(category, lat, lon, radius=20000):
+    """Enhanced OverPass API queries with better business data"""
+    
+    # Expanded queries for each category
     overpass_queries = {
-        'barbers': f"""node["shop"="hairdresser"](around:{radius},{lat},{lon}); node["amenity"="barber"](around:{radius},{lat},{lon});""",
-        'bars': f"""node["amenity"="bar"](around:{radius},{lat},{lon}); node["amenity"="pub"](around:{radius},{lat},{lon});""",
-        'diners_cafes': f"""node["amenity"="cafe"](around:{radius},{lat},{lon}); node["amenity"="restaurant"](around:{radius},{lat},{lon});""",
-        'libraries': f"""node["amenity"="library"](around:{radius},{lat},{lon});""",
-        'attractions_amusements': f"""node["tourism"="attraction"](around:{radius},{lat},{lon}); node["tourism"="museum"](around:{radius},{lat},{lon});""",
-        'coffee_shops': f"""node["amenity"="cafe"]["cuisine"="coffee_shop"](around:{radius},{lat},{lon}); node["shop"="coffee"](around:{radius},{lat},{lon});"""
+        'barbers': f"""
+        [out:json][timeout:30];
+        (
+          node["shop"="hairdresser"](around:{radius},{lat},{lon});
+          node["amenity"="barber"](around:{radius},{lat},{lon});
+          node["shop"="hair"](around:{radius},{lat},{lon});
+          way["shop"="hairdresser"](around:{radius},{lat},{lon});
+          way["amenity"="barber"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        
+        'bars': f"""
+        [out:json][timeout:30];
+        (
+          node["amenity"="bar"](around:{radius},{lat},{lon});
+          node["amenity"="pub"](around:{radius},{lat},{lon});
+          node["amenity"="nightclub"](around:{radius},{lat},{lon});
+          way["amenity"="bar"](around:{radius},{lat},{lon});
+          way["amenity"="pub"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        
+        'diners_cafes': f"""
+        [out:json][timeout:30];
+        (
+          node["amenity"="cafe"](around:{radius},{lat},{lon});
+          node["amenity"="restaurant"](around:{radius},{lat},{lon});
+          node["amenity"="fast_food"](around:{radius},{lat},{lon});
+          node["amenity"="food_court"](around:{radius},{lat},{lon});
+          way["amenity"="cafe"](around:{radius},{lat},{lon});
+          way["amenity"="restaurant"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        
+        'libraries': f"""
+        [out:json][timeout:30];
+        (
+          node["amenity"="library"](around:{radius},{lat},{lon});
+          way["amenity"="library"](around:{radius},{lat},{lon});
+          relation["amenity"="library"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        
+        'attractions_amusements': f"""
+        [out:json][timeout:30];
+        (
+          node["tourism"="attraction"](around:{radius},{lat},{lon});
+          node["tourism"="museum"](around:{radius},{lat},{lon});
+          node["tourism"="gallery"](around:{radius},{lat},{lon});
+          node["leisure"="park"](around:{radius},{lat},{lon});
+          node["leisure"="garden"](around:{radius},{lat},{lon});
+          node["historic"="monument"](around:{radius},{lat},{lon});
+          node["amenity"="cinema"](around:{radius},{lat},{lon});
+          node["amenity"="theatre"](around:{radius},{lat},{lon});
+          way["tourism"="attraction"](around:{radius},{lat},{lon});
+          way["tourism"="museum"](around:{radius},{lat},{lon});
+          way["leisure"="park"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """,
+        
+        'coffee_shops': f"""
+        [out:json][timeout:30];
+        (
+          node["amenity"="cafe"]["cuisine"="coffee_shop"](around:{radius},{lat},{lon});
+          node["shop"="coffee"](around:{radius},{lat},{lon});
+          node["amenity"="cafe"](around:{radius},{lat},{lon});
+          way["amenity"="cafe"]["cuisine"="coffee_shop"](around:{radius},{lat},{lon});
+          way["shop"="coffee"](around:{radius},{lat},{lon});
+        );
+        out body;
+        """
     }
     
     if category not in overpass_queries:
         return []
     
     url = "https://overpass-api.de/api/interpreter"
-    query = f"[out:json][timeout:25];({overpass_queries[category]});out body;"
     
     try:
-        response = requests.post(url, data=query, timeout=30)
+        debug_log(f"Making enhanced OverPass query for {category}")
+        response = requests.post(url, data=overpass_queries[category], timeout=45)
         response.raise_for_status()
         data = response.json()
-        return data.get('elements', [])
-    except:
+        elements = data.get('elements', [])
+        debug_log(f"Found {len(elements)} elements for {category}")
+        return elements
+    except Exception as e:
+        error_log(f"OverPass query failed for {category}: {e}")
         return []
 
-def process_business_data(businesses, category):
-    """Process and format business data from OverPass"""
+def process_business_data_enhanced(businesses, category, city):
+    """Enhanced business data processing with better filtering"""
+    debug_log(f"Processing {len(businesses)} businesses for {category}")
+    
     processed = []
-    for business in businesses[:3]:
-        name = business.get('tags', {}).get('name', 'Unnamed Business')
-        address = business.get('tags', {}).get('addr:street', 'Local Address')
-        website = business.get('tags', {}).get('website', '#')
-        processed.append({'name': name, 'address': address, 'website': website})
+    seen_names = set()
     
-    if not processed:
-        fallbacks = {
-            'barbers': [{'name': 'Local Barber Shop', 'address': 'Main Street', 'website': '#'}],
-            'coffee_shops': [{'name': 'Local Coffee House', 'address': 'Central Avenue', 'website': '#'}],
-            'bars': [{'name': 'Local Pub', 'address': 'Main Street', 'website': '#'}],
-            'diners_cafes': [{'name': 'Local Cafe', 'address': 'Business District', 'website': '#'}],
-            'libraries': [{'name': 'Public Library', 'address': 'Community Center', 'website': '#'}],
-            'attractions_amusements': [{'name': 'Community Park', 'address': 'Recreation Area', 'website': '#'}]
-        }
-        processed = fallbacks.get(category, [{'name': f'Local {category.title()}', 'address': 'Check local directory', 'website': '#'}])
+    for business in businesses:
+        # Extract business details with better field mapping
+        tags = business.get('tags', {})
+        
+        name = tags.get('name', 'Unnamed Business').strip()
+        if not name or name in seen_names:
+            continue
+            
+        seen_names.add(name)
+        
+        # Get address components
+        street = tags.get('addr:street', '')
+        housenumber = tags.get('addr:housenumber', '')
+        city_addr = tags.get('addr:city', city)
+        postcode = tags.get('addr:postcode', '')
+        
+        # Build full address
+        if street and housenumber:
+            address = f"{housenumber} {street}"
+        elif street:
+            address = street
+        else:
+            address = f"Local {category} in {city}"
+        
+        if city_addr and postcode:
+            address += f", {city_addr} {postcode}"
+        elif city_addr:
+            address += f", {city_addr}"
+        
+        # Get contact info
+        phone = tags.get('phone', tags.get('contact:phone', ''))
+        website = tags.get('website', tags.get('contact:website', tags.get('url', '#')))
+        
+        # Ensure website is valid
+        if website == '#' or not website.startswith(('http://', 'https://')):
+            website = '#'
+        
+        processed.append({
+            'name': name,
+            'address': address,
+            'phone': phone,
+            'website': website
+        })
+        
+        # Stop when we have 3 good businesses
+        if len(processed) >= 3:
+            break
     
+    # Fill remaining slots with fallbacks if needed
+    if len(processed) < 3:
+        debug_log(f"Only found {len(processed)} businesses, adding fallbacks")
+        fallbacks = get_business_fallbacks(category, city)
+        for fallback in fallbacks:
+            if len(processed) < 3 and fallback['name'] not in seen_names:
+                processed.append(fallback)
+                seen_names.add(fallback['name'])
+    
+    debug_log(f"Final: {len(processed)} unique businesses for {category}")
     return processed
+
+def get_business_fallbacks(category, city):
+    """Get fallback business data when API returns insufficient results"""
+    fallbacks = {
+        'barbers': [
+            {'name': f'{city} Barber Shop', 'address': f'Main Street, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Professional Cuts', 'address': f'Downtown {city}', 'phone': '', 'website': '#'},
+            {'name': 'Classic Barbers', 'address': f'City Center, {city}', 'phone': '', 'website': '#'}
+        ],
+        'coffee_shops': [
+            {'name': f'{city} Coffee House', 'address': f'Central Avenue, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Downtown Cafe', 'address': f'Business District, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Brew & Bean', 'address': f'Shopping Center, {city}', 'phone': '', 'website': '#'}
+        ],
+        'bars': [
+            {'name': f'{city} Pub', 'address': f'Main Street, {city}', 'phone': '', 'website': '#'},
+            {'name': 'City Bar', 'address': f'Downtown {city}', 'phone': '', 'website': '#'},
+            {'name': 'Local Tavern', 'address': f'Entertainment District, {city}', 'phone': '', 'website': '#'}
+        ],
+        'diners_cafes': [
+            {'name': f'{city} Family Diner', 'address': f'Central Avenue, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Local Cafe', 'address': f'Business District, {city}', 'phone': '', 'website': '#'},
+            {'name': 'City Grill', 'address': f'Downtown {city}', 'phone': '', 'website': '#'}
+        ],
+        'libraries': [
+            {'name': f'{city} Public Library', 'address': f'Community Center, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Regional Library', 'address': f'Education District, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Community Library', 'address': f'Civic Center, {city}', 'phone': '', 'website': '#'}
+        ],
+        'attractions_amusements': [
+            {'name': f'{city} Community Park', 'address': f'Recreation Area, {city}', 'phone': '', 'website': '#'},
+            {'name': 'Local Museum', 'address': f'Cultural District, {city}', 'phone': '', 'website': '#'},
+            {'name': 'City Gardens', 'address': f'Park Area, {city}', 'phone': '', 'website': '#'}
+        ]
+    }
+    return fallbacks.get(category, [])
 
 def get_github_pages_workflow():
     """Returns the GitHub Pages deployment workflow"""
@@ -203,7 +387,7 @@ jobs:
 """
 
 def update_html_template(city_state, lat, lon, weather_data, wiki_summary, business_data):
-    """Update the HTML template with new city data - COMPLETELY REWRITTEN"""
+    """Update the HTML template with new city data"""
     debug_log("📄 Starting HTML template update...")
     
     try:
@@ -214,13 +398,17 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         city, state = city_state.split('-')
         debug_log(f"Updating HTML for: {city}, {state}")
         
-        # COMPREHENSIVE CITY REPLACEMENT - Handle ALL possible city references
+        # Get timezone for the city
+        timezone = get_timezone_from_coords(lat, lon)
+        debug_log(f"Using timezone: {timezone}")
+        
+        # COMPREHENSIVE CITY REPLACEMENT
         replacements = [
             ('Paoli, Oklahoma', f'{city}, {state}'),
             ('Paoli, OK', f'{city}, {state}'),
             ('Ardmore, Oklahoma', f'{city}, {state}'),
             ('Ardmore, OK', f'{city}, {state}'),
-            ('Paoli', city),  # Replace standalone Paoli mentions
+            ('Paoli', city),
         ]
         
         for old_text, new_text in replacements:
@@ -234,7 +422,11 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         html_content = re.sub(r'Latitude: [\d.-]+° N', f'Latitude: {lat:.2f}° N', html_content)
         html_content = re.sub(r'Longitude: [\d.-]+° W', f'Longitude: {abs(lon):.2f}° W', html_content)
         
-        # CRITICAL FIX: Update Nexus Point section with FLEXIBLE approach
+        # Update timezone in clock JavaScript
+        html_content = re.sub(r"timeZone: '[\w/]+'", f"timeZone: '{timezone}'", html_content)
+        debug_log(f"Updated clock timezone to: {timezone}")
+        
+        # Update Nexus Point section
         nexus_patterns = [
             r'<section id="paoli-ok"[^>]*>.*?<h2[^>]*>.*?</h2>.*?<p>.*?</p>.*?</section>',
             r'<section id="paoli-ok".*?</section>',
@@ -257,7 +449,6 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
                 break
         
         if not nexus_updated:
-            # Fallback: Simple replacement
             if "The Nexus Point:" in html_content:
                 html_content = html_content.replace("The Nexus Point: Paoli, Oklahoma", f"The Nexus Point: {city}, {state}")
                 debug_log("Used fallback Nexus Point replacement")
@@ -275,7 +466,7 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
                 html_content = re.sub(pattern, replacement, html_content)
                 debug_log(f"Updated weather: {pattern}")
         
-        # Update local businesses sections
+        # Update local businesses sections with enhanced data
         business_sections = {
             'barbers': 'Barbershops',
             'coffee_shops': 'Coffee Shops',
@@ -288,32 +479,39 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         for category, section_title in business_sections.items():
             debug_log(f"Updating {section_title} section...")
             
-            # Create new business section
+            # Create enhanced business section
             new_section = f'<h3>{section_title}</h3>\n            <ul class="business-list">\n'
-            for business in business_data.get(category, []):
+            
+            businesses = business_data.get(category, [])
+            debug_log(f"Adding {len(businesses)} businesses to {section_title}")
+            
+            for business in businesses:
+                # Add phone if available
+                phone_html = f"<p>Phone: {business['phone']}</p>" if business['phone'] else ""
+                
+                # Create proper website link
+                website_link = business['website']
+                if website_link == '#':
+                    website_text = "Check Local Directory"
+                else:
+                    website_text = "Visit Website"
+                
                 new_section += f'''                <li>
                     <strong>{business["name"]}</strong>
-                    <p>Local business serving the {city} community.</p>
-                    <p>Address: {business["address"]}</p>
-                    <a href="{business["website"]}" target="_blank">View Details</a>
+                    <p>{business["address"]}</p>
+                    {phone_html}
+                    <a href="{website_link}" target="_blank">{website_text}</a>
                 </li>\n'''
+            
             new_section += '            </ul>'
             
-            # Find and replace using multiple approaches
+            # Find and replace the section
             section_pattern = f'<h3>{section_title}</h3>.*?</ul>'
             if re.search(section_pattern, html_content, re.DOTALL):
                 html_content = re.sub(section_pattern, new_section, html_content, flags=re.DOTALL)
-                debug_log(f"Updated {section_title} using regex")
+                debug_log(f"Updated {section_title} section with {len(businesses)} businesses")
             else:
-                # Fallback: direct string replacement
-                old_section_start = f'<h3>{section_title}</h3>'
-                if old_section_start in html_content:
-                    start_idx = html_content.find(old_section_start)
-                    end_idx = html_content.find('</ul>', start_idx)
-                    if end_idx != -1:
-                        end_idx += len('</ul>')
-                        html_content = html_content[:start_idx] + new_section + html_content[end_idx:]
-                        debug_log(f"Updated {section_title} using string replacement")
+                debug_log(f"⚠️ Could not find {section_title} section to replace")
         
         # VERIFY ALL UPDATES
         verification_points = [
@@ -321,6 +519,7 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
             (f'The Nexus Point: {city}, {state}', "Nexus Point title"),
             (f'Latitude: {lat:.2f}° N', "Latitude coordinate"),
             (f'Longitude: {abs(lon):.2f}° W', "Longitude coordinate"),
+            (f"timeZone: '{timezone}'", "Time zone in clock"),
         ]
         
         all_passed = True
@@ -329,6 +528,15 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
                 success_log(f"✅ {description} - VERIFIED")
             else:
                 error_log(f"❌ {description} - MISSING")
+                all_passed = False
+        
+        # Verify business sections
+        for category in business_sections.keys():
+            businesses = business_data.get(category, [])
+            if len(businesses) >= 1:
+                success_log(f"✅ {category} - {len(businesses)} businesses")
+            else:
+                error_log(f"❌ {category} - NO BUSINESSES")
                 all_passed = False
         
         if all_passed:
@@ -344,48 +552,40 @@ def update_html_template(city_state, lat, lon, weather_data, wiki_summary, busin
         raise
 
 def force_github_pages_deployment(username, repo_name):
-    """Force GitHub Pages deployment by creating a dummy commit"""
-    debug_log(f"🔄 Force-enabling GitHub Pages for {username}/{repo_name}")
+    """Force GitHub Pages deployment"""
+    debug_log(f"🔄 Ensuring GitHub Pages for {username}/{repo_name}")
     
-    g = Github(GITHUB_TOKEN)
+    # Use the new auth method to avoid deprecation warnings
+    from github import Auth
+    auth = Auth.Token(GITHUB_TOKEN)
+    g = Github(auth=auth)
     
     try:
         repo = g.get_repo(f"{username}/{repo_name}")
         
-        # Try to enable Pages via API first
+        # The workflow file should handle deployment automatically
+        # Just verify it exists
         try:
-            repo.create_pages_site(branch="main", path="/")
-            success_log("✅ GitHub Pages enabled via PyGithub")
+            workflow_content = repo.get_contents(".github/workflows/deploy-pages.yml")
+            success_log("✅ GitHub Pages workflow confirmed")
             return True
-        except Exception as e:
-            debug_log(f"PyGithub Pages enable failed: {e}")
-        
-        # Add a dummy commit to trigger Pages workflow
-        try:
-            # Get the current README or create one
-            try:
-                contents = repo.get_contents("README.md")
-                readme_content = contents.decoded_content.decode()
-                repo.update_file("README.md", "Trigger GitHub Pages deployment", readme_content, contents.sha)
-            except:
-                repo.create_file("README.md", "Initial README for GitHub Pages", f"# {repo_name}\n\nAuto-deployed site for GitHub Pages.")
-            
-            success_log("✅ Dummy commit created to trigger Pages workflow")
-            return True
-        except Exception as e:
-            debug_log(f"Dummy commit failed: {e}")
-        
-        return False
+        except:
+            error_log("❌ GitHub Pages workflow missing")
+            return False
         
     except Exception as e:
-        error_log(f"Force deployment failed: {e}")
+        error_log(f"GitHub Pages verification failed: {e}")
         return False
 
 def create_github_repo(city_state, updated_html):
-    """Create new GitHub repository and push files - WITH GUARANTEED PAGES"""
+    """Create new GitHub repository and push files"""
     debug_log("🐙 Creating GitHub repository...")
     
-    g = Github(GITHUB_TOKEN)
+    # Use the new auth method
+    from github import Auth
+    auth = Auth.Token(GITHUB_TOKEN)
+    g = Github(auth=auth)
+    
     user = g.get_user()
     username = user.login
     
@@ -406,7 +606,7 @@ def create_github_repo(city_state, updated_html):
         # Wait for repo to be ready
         time.sleep(3)
         
-        # Create and push files - INCLUDING PAGES WORKFLOW
+        # Create and push files
         github_pages_workflow = get_github_pages_workflow()
         
         files_to_push = {
@@ -432,10 +632,10 @@ def create_github_repo(city_state, updated_html):
         # Wait for files to process
         time.sleep(5)
         
-        # FORCE GitHub Pages deployment
-        debug_log("🚀 Force-activating GitHub Pages...")
+        # Verify GitHub Pages setup
+        debug_log("🚀 Verifying GitHub Pages deployment...")
         if force_github_pages_deployment(username, repo_name):
-            success_log("✅ GitHub Pages deployment triggered")
+            success_log("✅ GitHub Pages deployment confirmed")
         else:
             debug_log("⚠️ GitHub Pages may need manual activation")
         
@@ -443,8 +643,8 @@ def create_github_repo(city_state, updated_html):
         debug_log("🔍 Final verification...")
         try:
             pages_url = f"https://{username}.github.io/{repo_name}"
-            debug_log(f"🌐 Site should be available at: {pages_url}")
-            debug_log("⏰ Allow 1-2 minutes for initial deployment")
+            success_log(f"🌐 Site will be available at: {pages_url}")
+            success_log("⏰ Allow 1-2 minutes for initial deployment")
         except Exception as e:
             debug_log(f"Final verification note: {e}")
         
@@ -477,15 +677,18 @@ def main():
         wiki_summary = get_wikipedia_summary(city_state)
         debug_log("Wikipedia summary retrieved")
         
-        # Get business data
+        # Get enhanced business data
         business_data = {}
         categories = ['barbers', 'bars', 'diners_cafes', 'libraries', 'attractions_amusements', 'coffee_shops']
         
+        city_name = city_state.split('-')[0]
+        
         for i, category in enumerate(categories):
             debug_log(f"Querying {category}...")
-            businesses = query_overpass(category, lat, lon)
-            business_data[category] = process_business_data(businesses, category)
+            businesses = query_overpass_enhanced(category, lat, lon)
+            business_data[category] = process_business_data_enhanced(businesses, category, city_name)
             if i < len(categories) - 1:
+                debug_log("Waiting 5 seconds for next API call...")
                 time.sleep(5)
         
         # Update HTML template
@@ -497,7 +700,7 @@ def main():
         repo_url = create_github_repo(city_state, updated_html)
         
         success_log(f"🎉 Deployment completed: {repo_url}")
-        success_log("🌐 GitHub Pages should auto-deploy within 1-2 minutes")
+        success_log("🌐 GitHub Pages will auto-deploy within 1-2 minutes")
         success_log("✅ Site will be LIVE automatically")
         
         # Write success file

@@ -120,29 +120,41 @@ def get_wikipedia_summary(city_state):
 def query_overpass_simple(category, lat, lon, radius=20000):
     """Simple OverPass API query that works reliably"""
     queries = {
-        'barbers': 'node["shop"="hairdresser","barber"]',
-        'bars': 'node["amenity"="bar","pub"]',
-        'diners_cafes': 'node["amenity"="cafe","restaurant"]',
-        'libraries': 'node["amenity"="library"]',
-        'attractions_amusements': 'node["tourism"="attraction","museum"]',
-        'coffee_shops': 'node["amenity"="cafe"]["cuisine"="coffee_shop"]'
+        'barbers': ['shop=hairdresser', 'amenity=barber'],
+        'bars': ['amenity=bar', 'amenity=pub'],
+        'diners_cafes': ['amenity=cafe', 'amenity=restaurant'],
+        'libraries': ['amenity=library'],
+        'attractions_amusements': ['tourism=attraction', 'tourism=museum', 'leisure=park'],
+        'coffee_shops': ['amenity=cafe', 'shop=coffee']
     }
     
     if category not in queries:
         return []
     
     url = "https://overpass-api.de/api/interpreter"
+    
+    # Build query with proper OverPass QL syntax
+    query_parts = []
+    for tag in queries[category]:
+        query_parts.append(f'node["{tag}"](around:{radius},{lat},{lon});')
+    
+    inner_query = " ".join(query_parts)
     query = f"""
     [out:json][timeout:30];
-    ({queries[category]}(around:{radius},{lat},{lon}););
+    (
+      {inner_query}
+    );
     out body;
     """
     
     try:
+        debug_log(f"Sending OverPass query for {category}")
         response = requests.post(url, data=query, timeout=30)
         response.raise_for_status()
         data = response.json()
-        return data.get('elements', [])
+        elements = data.get('elements', [])
+        debug_log(f"Found {len(elements)} elements for {category}")
+        return elements
     except Exception as e:
         debug_log(f"OverPass query failed for {category}: {e}")
         return []

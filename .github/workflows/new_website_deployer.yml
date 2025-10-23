@@ -1,90 +1,76 @@
-name: Deploy New City Website
+name: Deploy City Website
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only - NO AUTO WORKFLOWS!
     inputs:
-      confirm_deployment:
-        description: 'Type "DEPLOY" to confirm new repository creation'
-        required: true
-        default: 'DEPLOY'
+      city_override:
+        description: 'Optional: Override city name (leave blank to use new.txt)'
+        required: false
+        type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.confirm_deployment == 'DEPLOY' }}
+    
+    # Set timeout for the job
+    timeout-minutes: 30
     
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
       
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.10'
         
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests PyGithub
+        pip install PyGithub==2.1.1 requests==2.31.0
+        echo "✓ Dependencies installed"
         
-    - name: Debug - Initial state check
+    - name: Create city file if override provided
+      if: ${{ github.event.inputs.city_override != '' }}
       run: |
-        echo "=== INITIAL STATE DEBUG ==="
-        echo "Current directory: $(pwd)"
-        echo "Files:"
-        ls -la
-        echo "--- new.txt content ---"
+        echo "${{ github.event.inputs.city_override }}" > new.txt
+        echo "✓ Using override city: ${{ github.event.inputs.city_override }}"
+        
+    - name: Display city to be deployed
+      run: |
+        echo "📍 City to deploy:"
         cat new.txt
-        echo "--- index.html first 200 chars ---"
-        head -c 200 index.html
         echo ""
-        echo "=========================="
         
-    - name: Validate new.txt file
-      run: |
-        if [ ! -f "new.txt" ]; then
-          echo "❌ Error: new.txt file not found"
-          exit 1
-        fi
-        CONTENT=$(cat new.txt)
-        if [[ ! "$CONTENT" =~ ^[A-Za-z]+-[A-Za-z]+$ ]]; then
-          echo "❌ Error: new.txt must contain city-state format like 'Dallas-Texas'"
-          exit 1
-        fi
-        echo "✅ Valid city-state format: $CONTENT"
-        
-    - name: Deploy new city website
+    - name: Run deployment script
       env:
-        GITHUB_TOKEN: ${{ secrets.NEW7 }}
+        GH_TOKEN: ${{ secrets.NEW7 }}
       run: |
-        echo "=== Starting Python script ==="
+        echo "================================================"
+        echo "🚀 STARTING EYE TRY A.I. CITY WEBSITE DEPLOYMENT"
+        echo "================================================"
         python new_website_deployer.py
-        echo "=== Python script completed ==="
         
-    - name: Debug - Check for status files
-      run: |
-        echo "=== Checking for status files ==="
-        ls -la deployment_success.txt 2>/dev/null && echo "✅ deployment_success.txt exists" || echo "❌ deployment_success.txt not found"
-        ls -la deployment_error.txt 2>/dev/null && echo "✅ deployment_error.txt exists" || echo "❌ deployment_error.txt not found"
-        
-    - name: Check deployment status
-      run: |
-        echo "=== Checking deployment status ==="
-        if [ -f "deployment_success.txt" ]; then
-          echo "✅ Deployment successful!"
-          cat deployment_success.txt
-        elif [ -f "deployment_error.txt" ]; then
-          echo "❌ Deployment failed!"
-          cat deployment_error.txt
-          exit 1
-        else
-          echo "⚠️ Unknown deployment status - no status files found"
-          exit 1
-        fi
-          
-    - name: Cleanup status files
+    - name: Display deployment summary
       if: always()
       run: |
-        echo "=== Cleaning up status files ==="
-        rm -f deployment_success.txt deployment_error.txt
-        echo "✅ Cleanup completed"
+        echo ""
+        echo "================================================"
+        echo "📋 DEPLOYMENT SUMMARY"
+        echo "================================================"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Actor: ${{ github.actor }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "================================================"
+        echo ""
+        echo "ℹ️ Check the logs above for deployment status."
+        echo "ℹ️ New repository should appear in your GitHub account."
+        echo "ℹ️ GitHub Pages may take 5-10 minutes to activate."
+        echo ""
+        echo "📚 ATTRIBUTION & CITATIONS:"
+        echo "   • Wikipedia/Wikimedia Foundation - City information"
+        echo "   • OpenStreetMap contributors & Nominatim - Location data"
+        echo "   • Open-Meteo.com - Weather forecast data"
+        echo "   • Overpass API/OpenStreetMap - Local business data"
+        echo "================================================"
